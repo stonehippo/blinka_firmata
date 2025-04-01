@@ -1,4 +1,12 @@
-# Adding Firmata Support to Blinka
+# blinka-firmata
+
+A Python client for the [Firmata Protocol](https://github.com/firmata/protocol/).
+
+This client was written as a layer for [CircuitPython Blinka](https://circuitpython.org/blinka) to allow control of boards running Firmata, such as an Arduino Uno. It can also be used as a standalone module for controlling Firmata devices.
+
+This client supports the StandardFirmata firmware. Other Firmata firmware should work, possibly requiring some modifications to this library. Contributions for additional support are welcome.
+
+## Adding Firmata Support to Blinka
 
 There are several ways to use [Blinka](https://gist.github.com/stonehippo/2393ad06fb1d9524b22568f7110cf0ce) to connect a PC to peripherals like I2C and SPI. I am wondering if Blinka could also be made into a client for the classic [Firmata](https://github.com/firmata/protocol) protocol. This would make it possible to program devices running the [Firmata Arudino](https://github.com/firmata/arduino) using CircuitPython, which could be fun and useful.
 
@@ -32,3 +40,10 @@ I'm going to take my time on this work, so I'll be keeping track of what's done 
   - [ ] Other?
 - [ ] Figure out if this should use an existing Firmata client (e.g. [pymata4](https://github.com/MrYsLab/pymata4)) or if I create something new
 - [ ] Get a basic layer working
+
+
+-----
+
+Copyright (c) 2025 George White
+
+See [LICENSE](./LICENSE) for details.

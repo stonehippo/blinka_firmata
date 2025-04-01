@@ -1,0 +1,15 @@
+# pyproject.toml
+
+[build-system]
+requires = ["setuptools>=65.5.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "blinka-firmata"
+version = "0.1.0"
+description = "A lightweight Python client for Firmata"
+readme = "README.md"
+authors = [{ name = "George White", email = "stonehippo@gmail.com" }]
+dependencies = [
+    "pyserial >= 3.5",
+]
