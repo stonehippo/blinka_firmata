@@ -10,13 +10,13 @@ This client supports the StandardFirmata firmware. Other Firmata firmware should
 
 There are several ways to use [Blinka](https://gist.github.com/stonehippo/2393ad06fb1d9524b22568f7110cf0ce) to connect a PC to peripherals like I2C and SPI. I am wondering if Blinka could also be made into a client for the classic [Firmata](https://github.com/firmata/protocol) protocol. This would make it possible to program devices running the [Firmata Arudino](https://github.com/firmata/arduino) using CircuitPython, which could be fun and useful.
 
-If this works, it will be similar to the Blinka support for RP2040 devices](https://learn.adafruit.com/circuitpython-libraries-on-any-computer-with-raspberry-pi-pico). Firmata has support for several common peripherals, like GPIO, ADCs, and PWM, pluse more advanced stuff like I2C and SPI. It *should* be possible to use this as the base layer for at least some of Blinka's APIs.
+If this works, it will be similar to the [Blinka support for RP2040 devices](https://learn.adafruit.com/circuitpython-libraries-on-any-computer-with-raspberry-pi-pico). Firmata has support for several common peripherals, like GPIO, ADCs, and PWM, pluse more advanced stuff like I2C and SPI. It *should* be possible to use this as the base layer for at least some of Blinka's APIs.
 
 ## Why Do This?
 
 First, for the learning. It's always good to try out new things!
 
-Second, because Firmata has been around for quite a while and it's well understood. It has been the basis for a lot of extensions where controlling microcontroller board functions from a computer is desirable, such as [Johnny Five](https://johnny-five.io/) and [Gobot](https://gobot.io/). Although microcontrollers have gotten a lot more robust since the early days of Arduino, there are still times when you might need more heft than you can squeeze out of that tiny CPU.
+Second, because Firmata has been around for quite a while and it's well understood. It has been the basis for a lot of extensions where controlling microcontroller board functions from a computer is desirable, such as [Johnny Five](https://johnny-five.io/) and [Gobot](https://gobot.io/). Although microcontrollers have gotten a lot more robust since the early days of Arduino, there are still times when you might need more heft than you can squeeze out of that tiny microcontroller processor on its own.
 
 Third, CircuitPython is great. It has all the goodness of Python, has a set of portable core APIs across lots of hardware, and tons of drivers for all sorts of sensors and devices. I user CircuitPython whereever I can. I also happen to have a lot of less powerful, 8-bit based development boards around, like the classic ATMEGA328P-based Arduino. I would like to use that hardware with CircuitPython, but it doesn't have the juice. I can and do still write code using Arduino or PlatformIO, but there are use cases where using an Arduino + computer might make sense.
 
@@ -30,7 +30,7 @@ Of course, you could always just run CircuitPython on a single board computer li
 
 I'm going to take my time on this work, so I'll be keeping track of what's done and working (or not) here.
 
-- [ ] Do some research on Firmata and see what's possible
+- [x] Do some research on Firmata and see what's possible
 - [ ] Determine what features I went to support
   - [ ] GPIO
   - [ ] ADC
@@ -38,7 +38,7 @@ I'm going to take my time on this work, so I'll be keeping track of what's done 
   - [ ] I2C
   - [ ] SPI
   - [ ] Other?
-- [ ] Figure out if this should use an existing Firmata client (e.g. [pymata4](https://github.com/MrYsLab/pymata4)) or if I create something new
+- [x] ~~Figure out if this should use an existing Firmata client (e.g. [pymata4](https://github.com/MrYsLab/pymata4)) or if I create something new~~ I've decided to build something new. pymata4 is an archived project and many of the other Python-based Firmata libraries haven't been updates in a while
 - [ ] Get a basic layer working
 
 
