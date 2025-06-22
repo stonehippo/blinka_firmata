@@ -4,13 +4,13 @@ A Python client for the [Firmata Protocol](https://github.com/firmata/protocol/)
 
 This client was written as a layer for [CircuitPython Blinka](https://circuitpython.org/blinka) to allow control of boards running Firmata, such as an Arduino Uno. It can also be used as a standalone module for controlling Firmata devices.
 
-This client supports the StandardFirmata firmware. Other Firmata firmware should work, possibly requiring some modifications to this library. Contributions for additional support are welcome.
+The best was to use this client is the [ConfigurabFirmata firmware](https://github.com/firmata/ConfigurableFirmata). It has also been tested with StandardFirmata, though that firmaware is a bit out of date and has not been udpdate to support recent(ish) updates to the Firmata Prototcol. **I really do recommend using ConfigurableFirmate**. Other Firmata-compatible firmware should work, possibly requiring some modifications to this library. Contributions for additional support are welcome.
 
 ## Adding Firmata Support to Blinka
 
 There are several ways to use [Blinka](https://gist.github.com/stonehippo/2393ad06fb1d9524b22568f7110cf0ce) to connect a PC to peripherals like I2C and SPI. I am wondering if Blinka could also be made into a client for the classic [Firmata](https://github.com/firmata/protocol) protocol. This would make it possible to program devices running the [Firmata Arudino](https://github.com/firmata/arduino) using CircuitPython, which could be fun and useful.
 
-If this works, it will be similar to the [Blinka support for RP2040 devices](https://learn.adafruit.com/circuitpython-libraries-on-any-computer-with-raspberry-pi-pico). Firmata has support for several common peripherals, like GPIO, ADCs, and PWM, pluse more advanced stuff like I2C and SPI. It *should* be possible to use this as the base layer for at least some of Blinka's APIs.
+If this works, it will be similar to the [Blinka support for RP2040 devices](https://learn.adafruit.com/circuitpython-libraries-on-any-computer-with-raspberry-pi-pico). Firmata has support for several common peripherals, like GPIO, ADCs, and PWM, plus more advanced stuff like I2C and SPI. It *should* be possible to use this as the base layer for at least some of Blinka's APIs.
 
 ## Why Do This?
 
@@ -32,13 +32,13 @@ I'm going to take my time on this work, so I'll be keeping track of what's done 
 
 - [x] Do some research on Firmata and see what's possible
 - [ ] Determine what features I went to support
-  - [ ] GPIO
-  - [ ] ADC
-  - [ ] PWM
-  - [ ] I2C
-  - [ ] SPI
-  - [ ] Other?
-- [x] ~~Figure out if this should use an existing Firmata client (e.g. [pymata4](https://github.com/MrYsLab/pymata4)) or if I create something new~~ I've decided to build something new. pymata4 is an archived project and many of the other Python-based Firmata libraries haven't been updates in a while
+  - [x] GPIO
+  - [x] ADC
+  - [x] PWM
+  - [x] I2C
+  - [x] SPI
+  - [x] Other? (ConfigurableFirmata support Firmata 2.7.0; I'm going to *eventually* support the Servo and AccelStepper modules)
+- [x] ~~Figure out if this should use an existing Firmata client (e.g. [pymata4](https://github.com/MrYsLab/pymata4)) or if I create something new~~ I've decided to build something new. pymata4 (and it's sibling pymata-express) is an archived project and many of the other Python-based Firmata libraries haven't been updates in a while
 - [ ] Get a basic layer working
 
 
