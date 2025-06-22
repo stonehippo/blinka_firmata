@@ -1,11 +1,17 @@
+import asyncio
 from blinka_firmata.firmata import Firmata
 
 # Find and connect to the first serial port with a Firmata-compatible device
-# This assumes the standard baud rate for StandardFirmata of 57600bps
+# This assumes the standard baud rate for StandardFirmata of 115200bps
 board = Firmata()
 
-# Select a specific device and at a given data rata
-# board = Firmata(port="/dev/ttyUSB0", baud=115200)
+# Optionally select a specific device or at a given data rata
+# board = Firmata(port="/dev/ttyUSB0", baud=57600)
 
-# Cleanly close the serial port
-board.disconnect()
+async def main():
+	await board.connect()
+	await board.disconnect()
+
+if __name__ == "__main__":
+	asyncio.run(main())
+

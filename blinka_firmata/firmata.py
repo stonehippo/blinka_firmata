@@ -20,55 +20,97 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 '''
 
-import sys
-import serial
+import asyncio
+import aioserial
+
 from serial.tools import list_ports
 from serial.serialutil import SerialException
-import time
 
 from blinka_firmata.firmata_constants import FirmataConstants
+
+from typing import Optional
 
 class Firmata:
 	def __init__(
 			self,
-			port=None,
-			baud=57600,
-			reset_period=4
+			port:Optional[str]=None,
+			baud:int=115200,
+			reset_period:int=4,
+			loop:Optional[asyncio.AbstractEventLoop]=None
 		):
-		self._port = port
-		self._baud = baud
-		self._device = None
-		self._reset_period = reset_period
-		self._firmata_protocol = None
-		self._firmata_firmware = None
+		self._port:str = port
+		self._baudrate:int = baud
+		self._device:Optional[aioserial.AioSerial] = None
+		self._reset_period:int = reset_period
+		self._firmata_protocol:Optional[str] = None
+		self._firmata_firmware:Optional[str] = None
+		self._loop = loop
 
-		if port is None:
-			self._find_firmata()
+		# if port is None:
+		# 	self._find_firmata()
+		# else:
+		# 	self._connect_firmata()
+
+	@property
+	def port(self) -> int:
+		return self._port
+	
+	@property
+	def baudrate(self) -> int:
+		return self._baudrate
+	
+	@baudrate.setter
+	def baudrate(self, value: int):
+		self._device.baudrate = value
+		self._baudrate = self._device.baudrate
+
+	@property
+	def firmata_protocol(self) -> Optional[str]:
+		return self._firmata_protocol
+	
+	@property
+	def firmata_firmware(self) -> Optional[str]:
+		return self._firmata_firmware
+
+	@property 
+	def loop(self) -> Optional[asyncio.AbstractEventLoop]:
+		if self._loop:
+			return self._loop
 		else:
-			self._connect_firmata()
+			return asyncio.get_running_loop()
+	
+	@loop.setter
+	def loop(self, value: Optional[asyncio.AbstractEventLoop]):
+		self._loop = value
 
-	def _connect_firmata(self):
+	async def connect(self):
+		if self._port:
+			await self._connect_firmata()
+		else:
+			await self._find_firmata()
+
+	async def _connect_firmata(self):
 		print(f"Connecting to {self._port}…")
 		try:
-			self._device = serial.Serial(
-				self._port,
-				self._baud,
+			self._device = aioserial.AioSerial(
+				port=self._port,
+				baudrate=self._baudrate,
 				timeout=1,
 				write_timeout=0
 			)
 			# try to get Firmata info
-			self._firmata_protocol = self.get_firmata_protocol()
+			self._firmata_protocol = await self.get_firmata_protocol()
 			if self._firmata_protocol is not None:
 				print(f"Connected to Firmata device at {self._port} with protocol version {self._firmata_protocol}")
 			else:
-				self.disconnect()
+				await self.disconnect()
 				print(f"Device at {self._port} is not running Firmata")
 		except SerialException:
 			print(f"Failed to connect to {self._port}")
 			pass
 
 
-	def _find_firmata(self):
+	async def _find_firmata(self):
 		print("Checking for Firmata devices…")
 		ports = list_ports.comports()
 		# Find candidate devices
@@ -77,36 +119,36 @@ class Firmata:
 				# Open the candidate port and see if it could be a Firmata device
 				print(f"Trying {port.device}…")
 				self._port = port.device
-				self._connect_firmata()
+				await self._connect_firmata()
 				if self._firmata_protocol is not None:
 					# ok, we found a Firmata device, we're going to stop looking
 					break
 
 	# basic command sender
-	def _firmata_command(self, command):
+	async def _firmata_command(self, command):
 		command_bytes = bytes(command)
 		try:
-			response = self._device.write(command_bytes)
+			response = await self._device.write_async(command_bytes)
 		except SerialException:
 			raise RuntimeError('failed to send command')
 		return response
 
 	# system exclusive (sysex) command sender
-	def _firmata_sysex_command(self, command, data=[]):
+	async def _firmata_sysex_command(self, command, data=[]):
 		# create the basic command
 		sysex_command = [FirmataConstants.START_SYSEX, command, FirmataConstants.END_SYSEX]
 		# splice data into the command
 		sysex_command[2:1] = data
-		self._firmata_command(sysex_command)
+		await self._firmata_command(sysex_command)
 
-	def get_firmata_protocol(self):
-		response = self._firmata_command(FirmataConstants.REPORT_FIRMWARE)
+	async def get_firmata_protocol(self):
+		response = await self._firmata_command(FirmataConstants.REPORT_FIRMWARE)
 		return response
 	
-	def reset_firmata(self):
+	async def reset_firmata(self):
 		self._firmata_command(FirmataConstants.SYSTEM_RESET)
-		time.sleep(self._reset_period)
+		await asyncio.sleep(self._reset_period)
 
-	def disconnect(self):
+	async def disconnect(self):
 		self._device.close()
 		print(f"Disconnected Firmata device at {self._port}")
