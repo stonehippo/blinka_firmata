@@ -79,4 +79,9 @@ class FirmataConstants:
 	PIN_MODE_SERIAL =         0x0A # pin configured for serial communication
 	PIN_MODE_PULLUP =         0x0B # enable internal pull-up resistor for pin
 	PIN_MODE_IGNORE =         0x7F # pin configured to be ignored by digitalWrite and capabilityResponse
-
+	# Extensions under development - from ConfigurableFirmata, included in Firmata 2.7.0
+	PIN_MODE_SPI =            0x0C # pin configured for SPI
+	PIN_MODE_SONAR =          0x0D # pin configured for HC-SR04
+	PIN_MODE_TONE =           0x0E # pin configured for tone
+	PIN_MODE_DHT =            0x0F # pin configured for DHT
+	PIN_MODE_FREQUENCY =      0x10 # pin configured for frequency measurement
