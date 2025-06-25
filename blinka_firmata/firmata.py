@@ -175,6 +175,9 @@ class Firmata:
 	async def set_pin_mode(self, pin:int, mode:int):
 		command = (FirmataConstants.SET_PIN_MODE, pin, mode)
 		await self._firmata_command(command)
+
+		# give the system a moment to set the new pin mode
+		await asyncio.sleep(0.05)
 	
 	async def get_pin_state(self, pin:int) -> tuple:
 		report = None
