@@ -171,6 +171,25 @@ class Firmata:
 		await self._firmata_sysex_command(FirmataConstants.SAMPLING_INTERVAL, [data])
 		self._sampling_interval_ms = interval
 
+	# queries
+	async def analog_mapping_query(self):
+		"""
+		Query the mapping of analog pins defined by the firmware
+		"""
+		await self._firmata_sysex_command(FirmataConstants.ANALOG_MAPPING_QUERY)
+
+	async def capability_query(self):
+		"""
+		Query the capabilities (modes) available for the pins defined by the firmware
+		"""
+		await self._firmata_sysex_command(FirmataConstants.CAPABILITY_QUERY)
+
+	async def pin_state_query(self, pin:int):
+		"""
+		Query the state of a pin; the response is dependent on the current mode
+		"""
+		await self._firmata_sysex_command(FirmataConstants.PIN_STATE_QUERY)
+
 	# pin management
 	async def set_pin_mode(self, pin:int, mode:int):
 		command = (FirmataConstants.SET_PIN_MODE, pin, mode)
