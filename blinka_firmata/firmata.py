@@ -82,8 +82,8 @@ class Firmata:
 	
 	@property
 	def firmata_firmware(self) -> Optional[str]:
-		return self.self._report_data.get(FirmataConstants.REPORT_FIRMWARE)
-	
+		return self._report_data.get(FirmataConstants.REPORT_FIRMWARE)
+.self	
 	@property
 	def sampling_interval_ms(self) -> int:
 		return self._sampling_interval_ms
