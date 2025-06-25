@@ -34,6 +34,8 @@ from typing import Optional
 DIGITAL_PORTS = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
 
+STARTUP_DELAY = 4.0
+
 class Firmata:
 	def __init__(
 			self,
@@ -116,6 +118,7 @@ class Firmata:
 			
 			if self._firmata_protocol is not None:
 				print(f"Connected to Firmata device at {self._port} with protocol version {self._firmata_protocol}")
+				await asyncio.sleep(STARTUP_DELAY)
 			else:
 				await self.disconnect()
 				print(f"Device at {self._port} is not running Firmata")
