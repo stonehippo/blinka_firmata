@@ -114,7 +114,7 @@ class Firmata:
 				write_timeout=0
 			)
 			# try to get Firmata info
-			self._firmata_protocol = await self.get_firmata_protocol()
+			self._firmata_protocol = await self.report_version()
 			
 			if self._firmata_protocol is not None:
 				print(f"Connected to Firmata device at {self._port} with protocol version {self._firmata_protocol}")
@@ -158,9 +158,17 @@ class Firmata:
 		await self._firmata_command(sysex_command)
 
 	# firmware info and control
-	async def get_firmata_protocol(self):
-		response = await self._firmata_command(FirmataConstants.REPORT_FIRMWARE)
-		return response
+	async def report_version(self):
+		"""
+		Query the Firmata protocol version supported by the firmware
+		"""
+		return await self._firmata_command(FirmataConstants.REPORT_FIRMWARE)
+
+	async def report_firmware(self):
+		"""
+		Query the name and version of the firmware
+		"""
+		await self._firmata_sysex_command(FirmataConstants.REPORT_FIRMWARE)
 	
 	async def reset_firmata(self):
 		await self._firmata_command(FirmataConstants.SYSTEM_RESET)
