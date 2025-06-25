@@ -187,6 +187,15 @@ class Firmata:
 		return report
 
 	# digital pin operations
+	async def set_digital_pin_reporting(self, pin: int, enable:bool=True):
+		port, _ = _pin_port_and_mask(pin)
+		if enable:
+			command = (FirmataConstants.REPORT_DIGITAL + port, 1)
+		else:
+			command = (FirmataConstants.REPORT_DIGITAL + port, 1)
+		await self._firmata_command(command)
+
+
 	async def digital_write(self, pin:int, value:bool, use_port=False) -> None:
 		"""
 		Set a digital pin, either directly or via the port-pin
