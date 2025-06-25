@@ -48,11 +48,20 @@ class Firmata:
 		self._baudrate:int = baud
 		self._device:Optional[aioserial.AioSerial] = None
 		self._reset_period:int = reset_period
-		self._firmata_protocol:Optional[str] = None
-		self._firmata_firmware:Optional[str] = None
 		# Firmata typically polls its pins every 19ms; this can be set as low as 10ms
 		self._sampling_interval_ms:int = 19
 		self._loop = loop
+
+		# response data for queries and reports
+		self._report_data = {
+			FirmataConstants.ANALOG_MAPPING_RESPONSE: None,
+			FirmataConstants.CAPABILITY_RESPONSE: None,
+			FirmataConstants.PIN_STATE_RESPONSE: None,
+			FirmataConstants.REPORT_VERSION: "",
+			FirmataConstants.REPORT_FIRMWARE: "",
+			FirmataConstants.STRING_DATA: ""
+		}
+
 
 	@property
 	def port(self) -> int:
@@ -69,11 +78,11 @@ class Firmata:
 
 	@property
 	def firmata_protocol(self) -> Optional[str]:
-		return self._firmata_protocol
+		return self._report_data.get(FirmataConstants.REPORT_VERSION)
 	
 	@property
 	def firmata_firmware(self) -> Optional[str]:
-		return self._firmata_firmware
+		return self.self._report_data.get(FirmataConstants.REPORT_FIRMWARE)
 	
 	@property
 	def sampling_interval_ms(self) -> int:
@@ -90,7 +99,7 @@ class Firmata:
 	def loop(self, value: Optional[asyncio.AbstractEventLoop]):
 		self._loop = value
 
-	async def connect(self, find_timeout=15):
+	async def connect(self, find_timeout=5):
 		if self._port:
 			await self._connect_firmata()
 		else:
@@ -113,12 +122,17 @@ class Firmata:
 				timeout=1,
 				write_timeout=0
 			)
+
+			self.loop.create_task(self._firmata_data_handler())
+
 			# try to get Firmata info
+			print("Attempting to get Firmata firmware protocol version…")
 			self._firmata_protocol = await self.report_version()
 			
 			if self._firmata_protocol is not None:
-				print(f"Connected to Firmata device at {self._port} with protocol version {self._firmata_protocol}")
-				await asyncio.sleep(STARTUP_DELAY)
+				while self._report_data.get(FirmataConstants.REPORT_VERSION) == "":
+					await asyncio.sleep(0)
+				print(f"Connected to Firmata device at {self._port} with protocol version {self.firmata_protocol}")
 			else:
 				await self.disconnect()
 				print(f"Device at {self._port} is not running Firmata")
@@ -157,6 +171,62 @@ class Firmata:
 		sysex_command[2:1] = data
 		await self._firmata_command(sysex_command)
 
+	# event handler for incoming data from the firmware
+	async def _firmata_data_handler(self):
+		while True:
+			incoming = await self._device.read_async()
+
+			if incoming:
+				incoming = ord(incoming)
+
+			if incoming == FirmataConstants.REPORT_VERSION:
+				# read the next two bytes to get the version number
+				major, minor = bytearray(await self._device.read_async(size=2))
+
+				self._report_data[FirmataConstants.REPORT_VERSION] = f"{major}.{minor}"
+
+			if incoming == FirmataConstants.START_SYSEX:
+				await self._handle_sysex()
+
+			await asyncio.sleep(0)
+
+	async def _handle_sysex(self):
+		# what type of sysex is this?
+		report_type = None
+		incoming = ord(await self._device.read_async())
+
+		if incoming == FirmataConstants.REPORT_FIRMWARE:
+			report_type = FirmataConstants.REPORT_FIRMWARE
+			# get the firmware version number before the rest
+			fw_major, fw_minor = bytearray(await self._device.read_async(size=2))
+
+		if incoming == FirmataConstants.ANALOG_MAPPING_RESPONSE:
+			report_type = FirmataConstants.ANALOG_MAPPING_RESPONSE
+
+		if incoming == FirmataConstants.CAPABILITY_RESPONSE:
+			report_type = FirmataConstants.CAPABILITY_RESPONSE
+
+		if incoming == FirmataConstants.PIN_STATE_RESPONSE:
+			report_type = FirmataConstants.PIN_STATE_RESPONSE
+
+		if incoming == FirmataConstants.STRING_DATA:
+			report_type = FirmataConstants.STRING_DATA
+
+		sysex = []
+			
+		# read the rest of the sysex message
+		while incoming is not FirmataConstants.END_SYSEX:
+			incoming = ord(await self._device.read_async())
+			if incoming is not FirmataConstants.END_SYSEX:
+				if incoming:
+					sysex.append(incoming)
+			else:
+				s = "".join(chr(c) for c in sysex)
+				if report_type == FirmataConstants.REPORT_FIRMWARE:
+					s = f"{fw_major}.{fw_minor} {s}"
+				self._report_data[report_type] = s
+				report_type = None
+
 	# firmware info and control
 	async def report_version(self):
 		"""
@@ -168,7 +238,7 @@ class Firmata:
 		"""
 		Query the name and version of the firmware
 		"""
-		await self._firmata_sysex_command(FirmataConstants.REPORT_FIRMWARE)
+		return await self._firmata_sysex_command(FirmataConstants.REPORT_FIRMWARE)
 	
 	async def reset_firmata(self):
 		await self._firmata_command(FirmataConstants.SYSTEM_RESET)
@@ -222,7 +292,6 @@ class Firmata:
 			command = (FirmataConstants.REPORT_DIGITAL + port, 1)
 		await self._firmata_command(command)
 
-
 	async def digital_write(self, pin:int, value:bool, use_port=False) -> None:
 		"""
 		Set a digital pin, either directly or via the port-pin
@@ -247,7 +316,7 @@ class Firmata:
 		else:
 			command = (FirmataConstants.SET_DIGITAL_PIN_VALUE, pin, pin_value)
 		await self._firmata_command(command)
-	
+
 
 	# analog pin operations	
 	async def set_analog_pin_reporting(self, pin:int, enable=True):
