@@ -223,6 +223,13 @@ class Firmata:
 	
 
 	# analog pin operations	
+	async def set_analog_pin_reporting(self, pin:int, enable=True):
+		if enable:
+			command = (FirmataConstants.REPORT_ANALOG + pin, 1)
+		else:
+			command = (FirmataConstants.REPORT_ANALOG + pin, 1)
+		await self._firmata_command(command)
+
 	async def pwm_write(self, pin, value:int) -> None:
 		"""
 		Write a analog value to a pin
