@@ -142,8 +142,8 @@ class Firmata:
 					await asyncio.sleep(0)
 				print(f"Connected to Firmata device at {self._port} with protocol version {self.firmata_protocol}")
 				# Let's query the firmware to see what's available
-				await self.capability_query()
-				await self.analog_mapping_query()
+				await self._capability_query()
+				await self._analog_mapping_query()
 			else:
 				await self.disconnect()
 				print(f"Device at {self._port} is not running Firmata")
@@ -265,13 +265,13 @@ class Firmata:
 		self._sampling_interval_ms = interval
 
 	# queries
-	async def analog_mapping_query(self):
+	async def _analog_mapping_query(self):
 		"""
 		Query the mapping of analog pins defined by the firmware
 		"""
 		await self._firmata_sysex_command(FirmataConstants.ANALOG_MAPPING_QUERY)
 
-	async def capability_query(self):
+	async def _capability_query(self):
 		"""
 		Query the capabilities (modes) available for the pins defined by the firmware
 		"""
