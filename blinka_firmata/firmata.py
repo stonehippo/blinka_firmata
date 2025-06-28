@@ -50,7 +50,8 @@ class Firmata:
 		self._reset_period:int = reset_period
 		# Firmata typically polls its pins every 19ms; this can be set as low as 10ms
 		self._sampling_interval_ms:int = 19
-		self._loop = loop
+		self._loop:asyncio.EventLoop = loop
+		self._data_handler_task:Optional[asyncio.Task] = None
 
 		# response data for queries and reports
 		self._report_data = {
@@ -118,6 +119,10 @@ class Firmata:
 				print(f"Timed out trying to detect a device with Firmata after {find_timeout} seconds")
 
 	async def disconnect(self):
+		try:
+			await self._data_handler_task.cancel()
+		except:
+			pass
 		self._device.close()
 		print(f"Disconnected Firmata device at {self._port}")
 
@@ -131,7 +136,7 @@ class Firmata:
 				write_timeout=0
 			)
 
-			self.loop.create_task(self._firmata_data_handler())
+			self._data_handler_task = self.loop.create_task(self._firmata_data_handler())
 
 			# try to get Firmata info
 			print("Attempting to get Firmata firmware protocol version…")
