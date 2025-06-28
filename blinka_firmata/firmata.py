@@ -83,7 +83,15 @@ class Firmata:
 	@property
 	def firmata_firmware(self) -> Optional[str]:
 		return self._report_data.get(FirmataConstants.REPORT_FIRMWARE)
+
 	
+	@property
+	def capability_map(self) -> Optional[list]:
+		return self._report_data.get(FirmataConstants.CAPABILITY_RESPONSE)
+	
+	@property
+	def analog_map(self) -> Optional[list]:
+		return self._report_data.get(FirmataConstants.ANALOG_MAPPING_RESPONSE)	
 	@property
 	def sampling_interval_ms(self) -> int:
 		return self._sampling_interval_ms
@@ -133,6 +141,9 @@ class Firmata:
 				while self._report_data.get(FirmataConstants.REPORT_VERSION) == "":
 					await asyncio.sleep(0)
 				print(f"Connected to Firmata device at {self._port} with protocol version {self.firmata_protocol}")
+				# Let's query the firmware to see what's available
+				await self.capability_query()
+				await self.analog_mapping_query()
 			else:
 				await self.disconnect()
 				print(f"Device at {self._port} is not running Firmata")
@@ -176,6 +187,7 @@ class Firmata:
 		while True:
 			incoming = await self._device.read_async()
 
+			# guard against empty bytes returned
 			if incoming:
 				incoming = ord(incoming)
 
@@ -213,18 +225,21 @@ class Firmata:
 			report_type = FirmataConstants.STRING_DATA
 
 		sysex = []
-			
+		
 		# read the rest of the sysex message
 		while incoming is not FirmataConstants.END_SYSEX:
 			incoming = ord(await self._device.read_async())
+			# print(incoming, flush=True)
 			if incoming is not FirmataConstants.END_SYSEX:
-				if incoming:
-					sysex.append(incoming)
+				sysex.append(incoming)
 			else:
-				s = "".join(chr(c) for c in sysex)
-				if report_type == FirmataConstants.REPORT_FIRMWARE:
-					s = f"{fw_major}.{fw_minor} {s}"
-				self._report_data[report_type] = s
+				if report_type is FirmataConstants.REPORT_FIRMWARE or report_type is FirmataConstants.STRING_DATA:
+					s = "".join(chr(c) for c in sysex)
+					if report_type == FirmataConstants.REPORT_FIRMWARE:
+						s = f"{fw_major}.{fw_minor} {s}"
+					self._report_data[report_type] = s
+				else:
+					self._report_data[report_type] = sysex
 				report_type = None
 
 	# firmware info and control
