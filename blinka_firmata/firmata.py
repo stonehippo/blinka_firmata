@@ -91,6 +91,10 @@ class Firmata:
 		return self._report_data.get(FirmataConstants.CAPABILITY_RESPONSE)
 	
 	@property
+	def readable_capability_map(self) -> Optional[dict]:
+		return _translate_capability_map(self.capability_map)
+	
+	@property
 	def analog_map(self) -> Optional[list]:
 		return self._report_data.get(FirmataConstants.ANALOG_MAPPING_RESPONSE)	
 	@property
@@ -365,4 +369,32 @@ class Firmata:
 # utility functions
 def _pin_port_and_mask(pin:int) -> tuple:
 	return (pin // 8, 1 << (pin % 8))
+
+def _translate_capability_map(cmap:list=None) -> dict:
+	"""
+	Create a human-readable version of the capability map sent by the firmaware
+	"""
+	if cmap is None:
+		return None
 	
+	MODES = ["DIGITAL_INPUT","DIGITAL_OUTPUT","ANALOG_INPUT","PWM","SERVO","SHIFT","I2C","ONEWIRE","STEPPER","ENCODER","SERIAL","INPUT_PULLUP","SPI","SONAR","TONE","DHT","FREQUENCY"]
+	pin:int = 0
+	tmap:dict = {}
+	caps:list = []
+	cap = True # flip flop betwen the capability and its resolution
+	
+	for item in cmap:
+		if item == 127: # this is the end of a pins capablities
+			tmap[f"pin_{pin}"] = caps
+			caps = []
+			pin = pin + 1
+		else:
+			if cap:
+				item = MODES[item]
+				cap = False
+			else:
+				cap = True
+			caps.append(item)
+
+	return tmap
+
