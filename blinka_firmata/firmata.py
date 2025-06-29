@@ -199,6 +199,10 @@ class Firmata:
 			# guard against empty bytes returned
 			if incoming:
 				incoming = ord(incoming)
+			else:
+				continue
+
+			print(incoming, flush=True)
 
 			if incoming == FirmataConstants.REPORT_VERSION:
 				# read the next two bytes to get the version number
