@@ -317,7 +317,7 @@ class Firmata:
 		if enable:
 			command = (FirmataConstants.REPORT_DIGITAL + port, 1)
 		else:
-			command = (FirmataConstants.REPORT_DIGITAL + port, 1)
+			command = (FirmataConstants.REPORT_DIGITAL + port, 0)
 		await self._firmata_command(command)
 
 	async def digital_write(self, pin:int, value:bool, use_port=False) -> None:
@@ -351,7 +351,7 @@ class Firmata:
 		if enable:
 			command = (FirmataConstants.REPORT_ANALOG + pin, 1)
 		else:
-			command = (FirmataConstants.REPORT_ANALOG + pin, 1)
+			command = (FirmataConstants.REPORT_ANALOG + pin, 0)
 		await self._firmata_command(command)
 
 	async def pwm_write(self, pin, value:int) -> None:
