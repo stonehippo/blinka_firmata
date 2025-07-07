@@ -219,43 +219,50 @@ class Firmata:
 
 	async def _handle_sysex(self):
 		# what type of sysex is this?
-		report_type = None
 		incoming = ord(await self._device.read_async())
+		handler = await self._sysex_handler_factory(incoming)
 
-		if incoming == FirmataConstants.REPORT_FIRMWARE:
-			report_type = FirmataConstants.REPORT_FIRMWARE
-			# get the firmware version number before the rest
-			fw_major, fw_minor = bytearray(await self._device.read_async(size=2))
+		sysex = await handler()
 
-		if incoming == FirmataConstants.ANALOG_MAPPING_RESPONSE:
-			report_type = FirmataConstants.ANALOG_MAPPING_RESPONSE
+		self._report_data[incoming] = sysex
 
-		if incoming == FirmataConstants.CAPABILITY_RESPONSE:
-			report_type = FirmataConstants.CAPABILITY_RESPONSE
+	async def _sysex_handler_factory(self, report_type):
+		if report_type == FirmataConstants.REPORT_FIRMWARE:
+			return self._build_sysex_firmware
 
-		if incoming == FirmataConstants.PIN_STATE_RESPONSE:
-			report_type = FirmataConstants.PIN_STATE_RESPONSE
-
-		if incoming == FirmataConstants.STRING_DATA:
-			report_type = FirmataConstants.STRING_DATA
-
-		sysex = []
+		if report_type == FirmataConstants.STRING_DATA:
+			return self._build_sysex_string
 		
-		# read the rest of the sysex message
+		return self._build_sysex
+	
+	async def _build_sysex(self) -> list:
+		sysex = []
+		incoming = None
+		
 		while incoming is not FirmataConstants.END_SYSEX:
 			incoming = ord(await self._device.read_async())
-			# print(incoming, flush=True)
+
 			if incoming is not FirmataConstants.END_SYSEX:
 				sysex.append(incoming)
-			else:
-				if report_type is FirmataConstants.REPORT_FIRMWARE or report_type is FirmataConstants.STRING_DATA:
-					s = "".join(chr(c) for c in sysex)
-					if report_type == FirmataConstants.REPORT_FIRMWARE:
-						s = f"{fw_major}.{fw_minor} {s}"
-					self._report_data[report_type] = s
-				else:
-					self._report_data[report_type] = sysex
-				report_type = None
+
+		return sysex
+
+	async def _build_sysex_firmware(self) -> str:
+		# get the firmware version number before the rest
+		fw_major, fw_minor = bytearray(await self._device.read_async(size=2))
+		
+		sysex = await self._build_sysex()
+		s = "".join(chr(c) for c in sysex)
+		s = f"{fw_major}.{fw_minor} {s}"
+
+		return s
+
+	async def _build_sysex_string(self) -> str:
+		sysex = await self._build_sysex()
+		s = "".join(chr(c) for c in sysex)
+
+		return s
+		
 
 	# firmware info and control
 	async def report_version(self):
@@ -403,4 +410,3 @@ def _translate_capability_map(cmap:list=None) -> dict:
 			caps.append(item)
 
 	return tmap
-
