@@ -30,10 +30,6 @@ from blinka_firmata.firmata_constants import FirmataConstants
 
 from typing import Optional
 
-# store the state of the digital ports
-DIGITAL_PORTS = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
-
 STARTUP_DELAY = 4.0
 
 class Firmata:
@@ -63,6 +59,11 @@ class Firmata:
 			FirmataConstants.STRING_DATA: ""
 		}
 
+		# digital port data	
+		self._digital_ports = [0x00, 0x00, 0x00,
+						 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
+
+		# references to callback functions for incoming data
 
 	@property
 	def port(self) -> int:
@@ -85,7 +86,6 @@ class Firmata:
 	def firmata_firmware(self) -> Optional[str]:
 		return self._report_data.get(FirmataConstants.REPORT_FIRMWARE)
 
-	
 	@property
 	def capability_map(self) -> Optional[list]:
 		return self._report_data.get(FirmataConstants.CAPABILITY_RESPONSE)
@@ -344,10 +344,10 @@ class Firmata:
 		if use_port:
 			port, mask = _pin_port_and_mask(pin)
 			if pin_value == 1:
-				DIGITAL_PORTS[port] |= mask
+				self._digital_ports[port] |= mask
 			else:
-				DIGITAL_PORTS[port] &= ~mask
-			command = (FirmataConstants.DIGITAL_MESSAGE + port, DIGITAL_PORTS[port] & 0x7f, (DIGITAL_PORTS[port] >> 7) & 0x7f)
+				self._digital_ports[port] &= ~mask
+			command = (FirmataConstants.DIGITAL_MESSAGE + port, self._digital_ports[port] & 0x7f, (self._digital_ports[port] >> 7) & 0x7f)
 		else:
 			command = (FirmataConstants.SET_DIGITAL_PIN_VALUE, pin, pin_value)
 		await self._firmata_command(command)
@@ -363,7 +363,7 @@ class Firmata:
 			command = (FirmataConstants.REPORT_ANALOG + pin, 0)
 		await self._firmata_command(command)
 
-	async def pwm_write(self, pin, value:int) -> None:
+	async def pwm_write(self, pin:int, value:int):
 		"""
 		Write a analog value to a pin
 
