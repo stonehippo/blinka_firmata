@@ -205,15 +205,17 @@ class Firmata:
 			print(incoming, flush=True)
 
 			if incoming == FirmataConstants.REPORT_VERSION:
-				# read the next two bytes to get the version number
-				major, minor = bytearray(await self._device.read_async(size=2))
-
-				self._report_data[FirmataConstants.REPORT_VERSION] = f"{major}.{minor}"
+				await self._handle_report_version()
 
 			if incoming == FirmataConstants.START_SYSEX:
 				await self._handle_sysex()
 
 			await asyncio.sleep(0)
+
+	async def _handle_report_version(self):
+		# read the next two bytes to get the version number
+		major, minor = bytearray(await self._device.read_async(size=2))
+		self._report_data[FirmataConstants.REPORT_VERSION] = f"{major}.{minor}"		
 
 	async def _handle_sysex(self):
 		# what type of sysex is this?
