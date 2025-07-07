@@ -202,8 +202,6 @@ class Firmata:
 			else:
 				continue
 
-			print(incoming, flush=True)
-
 			if incoming == FirmataConstants.REPORT_VERSION:
 				await self._handle_report_version()
 
@@ -220,9 +218,9 @@ class Firmata:
 	async def _handle_sysex(self):
 		# what type of sysex is this?
 		incoming = ord(await self._device.read_async())
-		handler = await self._sysex_handler_factory(incoming)
+		sysex_handler = await self._sysex_handler_factory(incoming)
 
-		sysex = await handler()
+		sysex = await sysex_handler()
 
 		self._report_data[incoming] = sysex
 
