@@ -308,6 +308,16 @@ class Firmata:
 		command = (FirmataConstants.SET_PIN_MODE, pin, mode)
 		await self._firmata_command(command)
 
+		if mode is FirmataConstants.PIN_MODE_ANALOG:
+			await self.set_digital_pin_reporting(pin, enable=False)
+			await self.set_analog_pin_reporting(pin, enable=True)
+		elif mode is FirmataConstants.PIN_MODE_INPUT or mode is FirmataConstants.PIN_MODE_PULLUP:
+			await self.set_analog_pin_reporting(pin, enable=False)
+			await self.set_digital_pin_reporting(pin, enable=True)
+		else:
+			await self.set_analog_pin_reporting(pin, enable=False)
+			await self.set_digital_pin_reporting(pin, enable=False)
+
 		# give the system a moment to set the new pin mode
 		await asyncio.sleep(0.05)
 	
