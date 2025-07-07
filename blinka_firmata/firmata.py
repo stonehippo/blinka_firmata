@@ -354,7 +354,9 @@ class Firmata:
 
 
 	# analog pin operations	
-	async def set_analog_pin_reporting(self, pin:int, enable=True):
+	async def set_analog_pin_reporting(self, pin, enable=True):
+		if isinstance(pin, str):
+			pin = self._translate_analog_pin(pin)
 		if enable:
 			command = (FirmataConstants.REPORT_ANALOG + pin, 1)
 		else:
@@ -376,6 +378,16 @@ class Firmata:
 		else:
 			data = [pin, value & 0x7f, (value >> 7) & 0x7f, (value >> 14) & 0x7f]
 			await self._firmata_sysex_command(FirmataConstants.EXTENDED_ANALOG, data)
+
+	def _translate_analog_pin(self, analog_pin:str) -> int:
+		try:
+			possible_pin = analog_pin.upper().lstrip("A")
+			if possible_pin.isnumeric():
+				return self.analog_map.index(int(possible_pin))
+			else:
+				raise Exception(f"{analog_pin} is not a valid analog pin")
+		except:
+			raise Exception(f"{analog_pin} is not a valid analog pin")
 
 # utility functions
 def _pin_port_and_mask(pin:int) -> tuple:
