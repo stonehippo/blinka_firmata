@@ -208,6 +208,12 @@ class Firmata:
 			if incoming == FirmataConstants.START_SYSEX:
 				await self._handle_sysex()
 
+			if incoming in FirmataConstants.DIGITAL_MESSAGE_PORTS:
+				await self._digital_event_handler(incoming)
+
+			if incoming in FirmataConstants.ANALOG_MESSAGE_PINS:
+				await self._analog_event_handler(incoming)
+
 			await asyncio.sleep(0)
 
 	async def _handle_report_version(self):
@@ -361,7 +367,9 @@ class Firmata:
 		else:
 			command = (FirmataConstants.SET_DIGITAL_PIN_VALUE, pin, pin_value)
 		await self._firmata_command(command)
-
+	
+	async def _digital_event_handler(self, incoming):
+		pass
 
 	# analog pin operations	
 	async def set_analog_pin_reporting(self, pin, enable=True):
@@ -388,6 +396,9 @@ class Firmata:
 		else:
 			data = [pin, value & 0x7f, (value >> 7) & 0x7f, (value >> 14) & 0x7f]
 			await self._firmata_sysex_command(FirmataConstants.EXTENDED_ANALOG, data)
+
+	async def _analog_event_handler(self, incoming):
+		pass
 
 	def _translate_analog_pin(self, analog_pin:str) -> int:
 		try:

@@ -85,3 +85,7 @@ class FirmataConstants:
 	PIN_MODE_TONE =           0x0E # pin configured for tone
 	PIN_MODE_DHT =            0x0F # pin configured for DHT
 	PIN_MODE_FREQUENCY =      0x10 # pin configured for frequency measurement
+
+	# port ranges for digital and analog messages
+	DIGITAL_MESSAGE_PORTS = range(DIGITAL_MESSAGE, DIGITAL_MESSAGE + 16)
+	ANALOG_MESSAGE_PINS = range(ANALOG_MESSAGE, ANALOG_MESSAGE + 16)
