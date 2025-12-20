@@ -121,6 +121,7 @@ class Firmata:
 					await self._find_firmata()
 			except TimeoutError:
 				print(f"Timed out trying to detect a device with Firmata after {find_timeout} seconds")
+		await asyncio.sleep(2)
 
 	async def disconnect(self):
 		try:
