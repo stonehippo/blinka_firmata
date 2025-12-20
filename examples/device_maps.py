@@ -16,9 +16,6 @@ async def main():
 	board = Firmata(baud=BOARD_SPEED)
 	await board.connect()
 
-	# pause to give the board time to get set up
-	await asyncio.sleep(2)
-
 	# pretty print the capability map of the device
 	print("\nBoard Capability Map")
 	print("--------------------")
