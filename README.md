@@ -4,7 +4,7 @@ A Python client for the [Firmata Protocol](https://github.com/firmata/protocol/)
 
 This client was written as a layer for [CircuitPython Blinka](https://circuitpython.org/blinka) to allow control of boards running Firmata, such as an Arduino Uno. It can also be used as a standalone module for controlling Firmata devices.
 
-The best was to use this client is the [ConfigurabFirmata firmware](https://github.com/firmata/ConfigurableFirmata). It has also been tested with StandardFirmata, though that firmaware is a bit out of date and has not been updated to support recent(ish) updates to the Firmata Prototcol. **I really do recommend using ConfigurableFirmata**. Other Firmata-compatible firmware should work, possibly requiring some modifications to this library. Contributions for additional support are welcome.
+The best way to use this client is with the [ConfigurabFirmata firmware](https://github.com/firmata/ConfigurableFirmata). It has also been tested with StandardFirmata, though that firmaware is a bit out of date and has not been updated to support recent(ish) additions to the Firmata Prototcol. **I really do recommend using ConfigurableFirmata**. Other Firmata-compatible firmware should work, possibly requiring some modifications to this library. Contributions for additional support are welcome.
 
 ## Adding Firmata Support to Blinka
 
@@ -18,11 +18,11 @@ First, for the learning. It's always good to try out new things!
 
 Second, because Firmata has been around for quite a while and it's well understood. It has been the basis for a lot of extensions where controlling microcontroller board functions from a computer is desirable, such as [Johnny Five](https://johnny-five.io/) and [Gobot](https://gobot.io/). Although microcontrollers have gotten a lot more robust since the early days of Arduino, there are still times when you might need more heft than you can squeeze out of that tiny microcontroller processor on its own.
 
-Third, CircuitPython is great. It has all the goodness of Python, has a set of portable core APIs across lots of hardware, and tons of drivers for all sorts of sensors and devices. I user CircuitPython whenever I can. I also happen to have a lot of less powerful, 8-bit based development boards around, like the classic ATMEGA328P-based Arduino. I would like to use that hardware with CircuitPython, but it doesn't have the juice. I can and do still write code using Arduino or PlatformIO, but there are use cases where using an Arduino + computer might make sense.
+Third, CircuitPython is great. It has all the goodness of Python, has a set of portable core APIs across lots of hardware, and tons of drivers for all sorts of sensors and devices. I use CircuitPython whenever I can. I also happen to have several less powerful, 8-bit based development boards around, like the classic ATMEGA328P-based Arduino. I would like to use that hardware with CircuitPython, but it doesn't have the juice. I can and do still write code using Arduino or PlatformIO, but there are use cases where using an Arduino + computer might make sense.
 
 Fourth, it's handy to have several options for using things like GPIO or I2C with a computer. Though I suspect some of the other Blinka options will always be stronger choices than anything sitting on top of Firmata, it doesn't hurt to have another tool available.
 
-Fifth, I have put together a [micro-class on physical computing with CircuitPython](https://github.com/stonehippo/microclass_physical_computing/). I use the Adafruit Proximity Trinkey for that class and it works very well. But I want to look at other ways to make it work. One possibility would be using an Arduino-compatible board for the hardware, with Blinka for the class instruction. This probably not the ideal way to make it work, but I'm going to use it as a test case for now. 
+Fifth, I have put together a [micro-class on physical computing with CircuitPython](https://github.com/stonehippo/microclass_physical_computing/). I use the Adafruit Proximity Trinkey for that class and it works very well. But I want to look at other ways to make it work. One possibility would be using an Arduino-compatible board for the hardware, with Blinka for the coduinf during class instruction. This is probably not the ideal way to make it work, but I'm going to use it as a test case for now. 
 
 Of course, you could always just run CircuitPython on a single board computer like a Raspberry PI, either directly or via Blinka. Sometimes, though, you just want to crank out code on your laptop and have it effect the real world.
 
@@ -31,16 +31,16 @@ Of course, you could always just run CircuitPython on a single board computer li
 I'm going to take my time on this work, so I'll be keeping track of what's done and working (or not) here.
 
 - [x] Do some research on Firmata and see what's possible
-- [ ] Determine what features I went to support
+- [x] Determine what features I went to support
   - [x] GPIO
   - [x] ADC
   - [x] PWM
   - [x] I2C
   - [x] SPI
-  - [x] Other? (ConfigurableFirmata support Firmata 2.7.0; I'm going to *eventually* support the Servo and AccelStepper modules)
-- [x] ~~Figure out if this should use an existing Firmata client (e.g. [pymata4](https://github.com/MrYsLab/pymata4)) or if I create something new~~ I've decided to build something new. pymata4 (and it's sibling pymata-express) is an archived project and many of the other Python-based Firmata libraries haven't been updates in a while
-- [ ] Get a basic layer working
-
+  - [x] Other? (ConfigurableFirmata supports Firmata 2.7.0; I'm going to *eventually* support the Servo and AccelStepper modules, too)
+- [x] ~~Figure out if this should use an existing Firmata client (e.g. [pymata4](https://github.com/MrYsLab/pymata4)) or if I create something new~~ I've decided to build something new. pymata4 (and it's sibling pymata-express) is an archived project and many of the other Python-based Firmata client libraries haven't been updated in a while
+- [x] Get a basic layer working
+- [ ] Add support for peripheral types like I2C and SPI
 
 -----
 
