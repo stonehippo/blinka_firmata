@@ -9,9 +9,9 @@ count = 5
 
 async def blink(count=3, delay=1):
 	for _ in range(count):
-		await board.digital_write(led_pin, 1)
+		await board.digital_write(led_pin, True)
 		await asyncio.sleep(delay)
-		await board.digital_write(led_pin, 0)
+		await board.digital_write(led_pin, False)
 		await asyncio.sleep(delay=interval)
 
 async def main():
