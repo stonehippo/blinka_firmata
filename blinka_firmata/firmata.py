@@ -40,7 +40,7 @@ class Firmata:
 			reset_period:int=4,
 			loop:Optional[asyncio.AbstractEventLoop]=None
 		):
-		self._port:str = port
+		self._port:Optional[str] = port
 		self._baudrate:int = baud
 		self._device:Optional[aioserial.AioSerial] = None
 		self._reset_period:int = reset_period
