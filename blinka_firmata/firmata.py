@@ -59,6 +59,9 @@ class Firmata:
 			FirmataConstants.STRING_DATA: ""
 		}
 
+		# flag to see if we're waiting for a response to a PIN_STATE_QUERY
+		self.PENDING_PIN_STATE_RESPONSE = False
+
 		# digital port data	
 		self._digital_ports = [0x00, 0x00, 0x00,
 						 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
@@ -240,6 +243,10 @@ class Firmata:
 		if report_type == FirmataConstants.STRING_DATA:
 			return self._build_sysex_string
 		
+		if report_type == FirmataConstants.PIN_STATE_RESPONSE:
+			self.PENDING_PIN_STATE_RESPONSE = False
+			return self._build_sysex
+		
 		return self._build_sysex
 	
 	async def _build_sysex(self) -> list:
@@ -308,11 +315,11 @@ class Firmata:
 		"""
 		await self._firmata_sysex_command(FirmataConstants.CAPABILITY_QUERY)
 
-	async def pin_state_query(self, pin:int):
+	async def _pin_state_query(self, pin:int):
 		"""
 		Query the state of a pin; the response is dependent on the current mode
 		"""
-		await self._firmata_sysex_command(FirmataConstants.PIN_STATE_QUERY)
+		await self._firmata_sysex_command(FirmataConstants.PIN_STATE_QUERY, [pin])
 
 	# pin management
 	async def set_pin_mode(self, pin:int, mode:int):
@@ -333,10 +340,11 @@ class Firmata:
 		await asyncio.sleep(0.05)
 	
 	async def get_pin_state(self, pin:int) -> tuple:
-		report = None
-		await self._firmata_sysex_command(FirmataConstants.PIN_STATE_QUERY, [pin])
-		while report is None:
-			await asyncio.sleep(0)
+		self.PENDING_PIN_STATE_RESPONSE = True
+		await self._pin_state_query(pin)
+		while self.PENDING_PIN_STATE_RESPONSE:
+			await asyncio.sleep(0.01)
+		report = self._report_data[FirmataConstants.PIN_STATE_RESPONSE]
 		return report
 
 	# digital pin operations
