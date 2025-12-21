@@ -46,7 +46,7 @@ class Firmata:
 		self._reset_period:int = reset_period
 		# Firmata typically polls its pins every 19ms; this can be set as low as 10ms
 		self._sampling_interval_ms:int = 19
-		self._loop:asyncio.EventLoop = loop
+		self._loop:Optional[asyncio.AbstractEventLoop] = loop
 		self._data_handler_task:Optional[asyncio.Task] = None
 
 		# response data for queries and reports
@@ -66,7 +66,7 @@ class Firmata:
 		# references to callback functions for incoming data
 
 	@property
-	def port(self) -> int:
+	def port(self) -> Optional[str]:
 		return self._port
 	
 	@property
@@ -75,8 +75,9 @@ class Firmata:
 	
 	@baudrate.setter
 	def baudrate(self, value: int):
-		self._device.baudrate = value
-		self._baudrate = self._device.baudrate
+		if self._device is not None:
+			self._device.baudrate = value
+			self._baudrate = self._device.baudrate
 
 	@property
 	def firmata_protocol(self) -> Optional[str]:
@@ -128,8 +129,9 @@ class Firmata:
 			await self._data_handler_task.cancel()
 		except:
 			pass
-		self._device.close()
-		print(f"Disconnected Firmata device at {self._port}")
+		finally:
+			self._device.close()
+			print(f"Disconnected Firmata device at {self._port}")
 
 	async def _connect_firmata(self):
 		print(f"Connecting to {self._port}…")
@@ -422,7 +424,7 @@ def _translate_capability_map(cmap:list=None) -> dict:
 	Create a human-readable version of the capability map sent by the firmaware
 	"""
 	if cmap is None:
-		return None
+		return
 	
 	MODES = ["DIGITAL_INPUT","DIGITAL_OUTPUT","ANALOG_INPUT","PWM","SERVO","SHIFT","I2C","ONEWIRE","STEPPER","ENCODER","SERIAL","INPUT_PULLUP","SPI","SONAR","TONE","DHT","FREQUENCY"]
 	pin:int = 0
