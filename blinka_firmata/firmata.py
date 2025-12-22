@@ -113,7 +113,12 @@ class Firmata:
 	
 	@property
 	def analog_map(self) -> Optional[list]:
-		return self._report_data.get(FirmataConstants.ANALOG_MAPPING_RESPONSE)	
+		return self._report_data.get(FirmataConstants.ANALOG_MAPPING_RESPONSE)
+	
+	@property
+	def analog_pins(self) -> Optional[tuple]:
+		return _get_analog_pins(self.analog_map)
+
 	@property
 	def sampling_interval_ms(self) -> int:
 		return self._sampling_interval_ms
@@ -374,14 +379,11 @@ class Firmata:
 		await self._firmata_command(command)
 
 		if mode is FirmataConstants.PIN_MODE_ANALOG:
-			await self.set_digital_pin_reporting(pin, enable=False)
 			await self.set_analog_pin_reporting(pin, enable=True)
 		elif mode is FirmataConstants.PIN_MODE_INPUT or mode is FirmataConstants.PIN_MODE_PULLUP:
-			await self.set_analog_pin_reporting(pin, enable=False)
-			await self.set_digital_pin_reporting(pin, enable=True)
-		else:
-			await self.set_analog_pin_reporting(pin, enable=False)
-			await self.set_digital_pin_reporting(pin, enable=False)
+			if pin in self.analog_pins:
+				await self.set_analog_pin_reporting(pin, enable=False)
+			await self.set_digital_port_reporting(pin, enable=True)
 
 		# give the system a moment to set the new pin mode
 		await asyncio.sleep(0.05)
@@ -501,3 +503,25 @@ def _translate_capability_map(cmap:list=None) -> dict:
 			caps.append(item)
 
 	return tmap
+
+def _get_analog_pins(amap:Optional[list]=None) -> Optional[tuple]:
+	if amap is None:
+		return
+	analog_pins = []
+
+	for pin in range(0, len(amap)):
+		if amap[pin] != 127:
+			analog_pins.append(pin)
+	
+	return tuple(analog_pins)
+
+def _port_pin_values(port:int, data:int, total_pins:int=20) -> list:
+        pin_values = []
+        pins_per_port = 8
+        start_pin = port * pins_per_port
+        stop_pin = min(total_pins, port * pins_per_port + pins_per_port)
+        for pin in range(start_pin, stop_pin):
+                value = data & 0x01
+                pin_values.append(value)
+                data >>= 1
+        return pin_values
