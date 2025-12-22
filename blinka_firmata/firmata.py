@@ -143,7 +143,6 @@ class Firmata:
 					await self._find_firmata()
 			except TimeoutError:
 				print(f"Timed out trying to detect a device with Firmata after {find_timeout} seconds")
-		await asyncio.sleep(2)
 
 	async def disconnect(self):
 		try:
@@ -397,7 +396,7 @@ class Firmata:
 		return report
 
 	# digital pin operations
-	async def set_digital_pin_reporting(self, pin: int, enable:bool=True):
+	async def set_digital_port_reporting(self, pin: int, enable:bool=True):
 		port, _ = _pin_port_and_mask(pin)
 		if enable:
 			command = (FirmataConstants.REPORT_DIGITAL + port, 1)
@@ -431,7 +430,18 @@ class Firmata:
 		await self._firmata_command(command)
 	
 	async def _digital_event_handler(self, incoming):
-		pass
+		# determine the port based on the initial message byte
+		port = _port_from_data(incoming)
+		# read the LSB and MSB from
+		LSB, MSB = await self._device.read_async(size=2)
+		data = (MSB << 7) + LSB
+		self._digital_ports[port] = data
+		# print(f"MSB: {MSB}, LSB: {LSB} ({data})")
+		# start = port * 8
+		# for pin in range(start, start + 8):
+		# 	value = data & 0x01
+		# 	print(pin, value)
+		# 	data >>= 1
 
 	# analog pin operations	
 	async def set_analog_pin_reporting(self, pin, enable=True):
@@ -476,7 +486,10 @@ class Firmata:
 def _pin_port_and_mask(pin:int) -> tuple:
 	return (pin // 8, 1 << (pin % 8))
 
-def _translate_capability_map(cmap:list=None) -> dict:
+def _port_from_data(data:int) -> int:
+	return data & 0x0f
+
+def _translate_capability_map(cmap:Optional[list]=None) -> Optional[dict]:
 	"""
 	Create a human-readable version of the capability map sent by the firmaware
 	"""
