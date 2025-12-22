@@ -59,7 +59,9 @@ class Firmata:
 			FirmataConstants.STRING_DATA: ""
 		}
 
-		# flag to see if we're waiting for a response to a PIN_STATE_QUERY
+		# flags to see if we're waiting for a response to a query
+		self.PENDING_ANALOG_MAPPING_RESPONSE = False
+		self.PENDING_CAPABILITY_RESPONSE = False
 		self.PENDING_PIN_STATE_RESPONSE = False
 
 		# digital port data	
@@ -157,8 +159,8 @@ class Firmata:
 					await asyncio.sleep(0)
 				print(f"Connected to Firmata device at {self._port} with protocol version {self.firmata_protocol}")
 				# Let's query the firmware to see what's available
-				await self._capability_query()
-				await self._analog_mapping_query()
+				await self.get_capability_map()
+				await self.get_analog_map()
 			else:
 				await self.disconnect()
 				print(f"Device at {self._port} is not running Firmata")
@@ -243,6 +245,14 @@ class Firmata:
 		if report_type == FirmataConstants.STRING_DATA:
 			return self._build_sysex_string
 		
+		if report_type == FirmataConstants.ANALOG_MAPPING_RESPONSE:
+			self.PENDING_ANALOG_MAPPING_RESPONSE = False
+			return self._build_sysex
+		
+		if report_type == FirmataConstants.CAPABILITY_RESPONSE:
+			self.PENDING_CAPABILITY_RESPONSE = False
+			return self._build_sysex
+
 		if report_type == FirmataConstants.PIN_STATE_RESPONSE:
 			self.PENDING_PIN_STATE_RESPONSE = False
 			return self._build_sysex
@@ -320,6 +330,19 @@ class Firmata:
 		Query the state of a pin; the response is dependent on the current mode
 		"""
 		await self._firmata_sysex_command(FirmataConstants.PIN_STATE_QUERY, [pin])
+
+	# device information
+	async def get_analog_map(self):
+		self.PENDING_ANALOG_MAPPING_RESPONSE = True
+		await self._analog_mapping_query()
+		while self.PENDING_ANALOG_MAPPING_RESPONSE:
+			await asyncio.sleep(0.01)
+
+	async def get_capability_map(self):
+		self.PENDING_CAPABILITY_RESPONSE = True
+		await self._capability_query()
+		while self.PENDING_CAPABILITY_RESPONSE:
+			await asyncio.sleep(0.01)
 
 	# pin management
 	async def set_pin_mode(self, pin:int, mode:int):
