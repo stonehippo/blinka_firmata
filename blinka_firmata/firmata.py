@@ -48,6 +48,7 @@ class Firmata:
 		self._sampling_interval_ms:int = 19
 		self._loop:Optional[asyncio.AbstractEventLoop] = loop
 		self._data_handler_task:Optional[asyncio.Task] = None
+		self._connection_state:bool = False
 
 		# response data for queries and reports
 		self._report_data = {
@@ -74,6 +75,16 @@ class Firmata:
 	def port(self) -> Optional[str]:
 		return self._port
 	
+	@port.setter
+	def port(self, value:str):
+		if self._connection_state:
+			raise ConnectionError("Cannot chance port while connected")
+		self._port = value
+
+	@property
+	def is_connected(self) -> bool:
+		return self._connection_state
+
 	@property
 	def baudrate(self) -> int:
 		return self._baudrate
@@ -135,7 +146,19 @@ class Firmata:
 		except:
 			pass
 		finally:
+			self.PENDING_ANALOG_MAPPING_RESPONSE = False
+			self.PENDING_CAPABILITY_RESPONSE = False
+			self.PENDING_PIN_STATE_RESPONSE = False
+			self._report_data = {
+				FirmataConstants.ANALOG_MAPPING_RESPONSE: None,
+				FirmataConstants.CAPABILITY_RESPONSE: None,
+				FirmataConstants.PIN_STATE_RESPONSE: None,
+				FirmataConstants.REPORT_VERSION: "",
+				FirmataConstants.REPORT_FIRMWARE: "",
+				FirmataConstants.STRING_DATA: ""
+			}
 			self._device.close()
+			self._connection_state = False
 			print(f"Disconnected Firmata device at {self._port}")
 
 	async def _connect_firmata(self):
@@ -161,6 +184,7 @@ class Firmata:
 				# Let's query the firmware to see what's available
 				await self.get_capability_map()
 				await self.get_analog_map()
+				self._connection_state = True
 			else:
 				await self.disconnect()
 				print(f"Device at {self._port} is not running Firmata")
