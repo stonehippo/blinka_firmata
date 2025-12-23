@@ -57,13 +57,15 @@ class Firmata:
 			FirmataConstants.PIN_STATE_RESPONSE: None,
 			FirmataConstants.REPORT_VERSION: "",
 			FirmataConstants.REPORT_FIRMWARE: "",
-			FirmataConstants.STRING_DATA: ""
+			FirmataConstants.STRING_DATA: "",
+			FirmataConstants.SAMPLING_INTERVAL: 19
 		}
 
 		# flags to see if we're waiting for a response to a query
 		self.PENDING_ANALOG_MAPPING_RESPONSE = False
 		self.PENDING_CAPABILITY_RESPONSE = False
 		self.PENDING_PIN_STATE_RESPONSE = False
+		self.PENDING_SAMPLING_INTERVAL_QUERY = False
 
 		# digital port data	
 		self._digital_ports = [0x00, 0x00, 0x00,
@@ -153,13 +155,15 @@ class Firmata:
 			self.PENDING_ANALOG_MAPPING_RESPONSE = False
 			self.PENDING_CAPABILITY_RESPONSE = False
 			self.PENDING_PIN_STATE_RESPONSE = False
+			self.PENDING_SAMPLING_INTERVAL_QUERY = False
 			self._report_data = {
 				FirmataConstants.ANALOG_MAPPING_RESPONSE: None,
 				FirmataConstants.CAPABILITY_RESPONSE: None,
 				FirmataConstants.PIN_STATE_RESPONSE: None,
 				FirmataConstants.REPORT_VERSION: "",
 				FirmataConstants.REPORT_FIRMWARE: "",
-				FirmataConstants.STRING_DATA: ""
+				FirmataConstants.STRING_DATA: "",
+				FirmataConstants.SAMPLING_INTERVAL: 19
 			}
 			self._device.close()
 			self._connection_state = False
@@ -284,6 +288,10 @@ class Firmata:
 		if report_type == FirmataConstants.PIN_STATE_RESPONSE:
 			self.PENDING_PIN_STATE_RESPONSE = False
 			return self._build_sysex
+			
+		if report_type == FirmataConstants.SAMPLING_INTERVAL:
+			self.PENDING_SAMPLING_INTERVAL_QUERY = False
+			return self._build_sysex_sampling_interval
 		
 		return self._build_sysex
 	
@@ -315,6 +323,9 @@ class Firmata:
 
 		return s
 		
+	async def _build_sysex_sampling_interval(self) -> int:
+		sysex = await self._build_sysex
+		return sysex[0] + (sysex[1] << 7)
 
 	# firmware info and control
 	async def report_version(self):
@@ -359,6 +370,12 @@ class Firmata:
 		"""
 		await self._firmata_sysex_command(FirmataConstants.PIN_STATE_QUERY, [pin])
 
+	async def _sampling_interval_query(self):
+		"""
+		Query to get current sampling rate from the firmware
+		"""
+		await self._firmata_sysex_command(FirmataConstants.SAMPLING_INTERVAL_QUERY)
+
 	# device information
 	async def get_analog_map(self):
 		self.PENDING_ANALOG_MAPPING_RESPONSE = True
@@ -371,6 +388,13 @@ class Firmata:
 		await self._capability_query()
 		while self.PENDING_CAPABILITY_RESPONSE:
 			await asyncio.sleep(0.01)
+			
+	async def get_sampling_interval(self):
+		self.PENDING_SAMPLING_INTERVAL_QUERY = True
+		await self._sampling_interval_query()
+		while self.PENDING_SAMPLING_INTERVAL_QUERY:
+			await asyncio.sleep(0.01)
+		return self._report_data[FirmataConstants.SAMPLING_INTERVAL]
 
 	# pin management
 	async def set_pin_mode(self, pin:int, mode:int):

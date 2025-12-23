@@ -60,8 +60,9 @@ class FirmataConstants:
 	CAPABILITY_RESPONSE =     0x6C # reply with supported modes and resolution
 	ANALOG_MAPPING_QUERY =    0x69 # ask for mapping of analog to pin numbers
 	ANALOG_MAPPING_RESPONSE = 0x6A # reply with mapping info
-	SAMPLING_INTERVAL =       0x7A # set the poll rate of the main loop
+	SAMPLING_INTERVAL =       0x7A # set the poll rate of the main loop (also used for sampling interval query response)
 	SCHEDULER_DATA =          0x7B # send a createtask/deletetask/addtotask/schedule/querytasks/querytask request to the scheduler
+	SAMPLING_INTERVAL_QUERY = 0x7C # request the current sampling interval
 	SYSEX_NON_REALTIME =      0x7E # MIDI Reserved for non-realtime messages
 	SYSEX_REALTIME =          0x7F # MIDI Reserved for realtime messages
 
