@@ -348,7 +348,7 @@ class Firmata:
 		if interval < 10:
 			raise ValueError("Sampling interval cannot be less than 10ms")
 		data = [interval & 0x7f, (interval >> 7) & 0x7f]
-		await self._firmata_sysex_command(FirmataConstants.SAMPLING_INTERVAL, [data])
+		await self._firmata_sysex_command(FirmataConstants.SAMPLING_INTERVAL, data)
 		self._sampling_interval_ms = interval
 
 	# queries
