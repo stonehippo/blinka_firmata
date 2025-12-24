@@ -12,6 +12,13 @@ There are several ways to use [Blinka](https://gist.github.com/stonehippo/2393ad
 
 If this works, it will be similar to the [Blinka support for RP2040 devices](https://learn.adafruit.com/circuitpython-libraries-on-any-computer-with-raspberry-pi-pico). Firmata has support for several common peripherals, like GPIO, ADCs, and PWM, plus more advanced stuff like I2C and SPI. It *should* be possible to use this as the base layer for at least some of Blinka's APIs.
 
+## Design Decisions
+
+- built on asyncio - faster performance trading off with some learning curve.
+- no polling API - the API only uses callbacks for data coming from Firmata. Firmata checks its pins at SAMPLING_INTERVAL (default is every 19ms).
+- minimal helper functions - the API is minimal and largely lines up with the Firmata protocol.
+- defaults to ConfigurableFirmata - connects at 115200 bps by default.
+
 ## Why Do This?
 
 First, for the learning. It's always good to try out new things!
