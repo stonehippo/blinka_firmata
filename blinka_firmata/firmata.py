@@ -32,6 +32,38 @@ from typing import Optional
 
 STARTUP_DELAY = 4.0
 
+class FirmataEvents:
+	def __init__(self) -> None:
+		self._registry = {
+			FirmataConstants.ANALOG_MESSAGE: {},
+			FirmataConstants.DIGITAL_MESSAGE: {}
+		}
+		# caches for previous values received
+		self._digital_values = {}
+		self._analog_values = {}
+
+	# callback management
+	def subscribe(self, pin, event_type=FirmataConstants.DIGITAL_MESSAGE, handler=None) -> None:
+		self._registry[event_type][pin] = handler
+
+	def unsubscribe(self, pin, event_type=FirmataConstants.DIGITAL_MESSAGE):
+		if pin in self._registry[event_type].keys():
+			self._registry[event_type].pop(pin)
+
+	async def handle_event(self, pin, event_type=FirmataConstants.DIGITAL_MESSAGE, port=None, value=None):
+		if pin in self._registry[event_type].keys():
+			if event_type == FirmataConstants.DIGITAL_MESSAGE:
+				# cache the value
+				if pin not in self._digital_values.keys():
+					self._digital_values[pin] = value
+					self._registry[event_type][pin]([pin, value])  # type: ignore	
+				if value != self._digital_values[pin]:
+						self._digital_values[pin] = value
+						self._registry[event_type][pin]([pin, value])  # type: ignore	
+			elif event_type == FirmataConstants.ANALOG_MESSAGE:
+				self._analog_values[pin] = value
+				self._registry[event_type][pin]([pin, value])
+
 class Firmata:
 	def __init__(
 			self,
@@ -60,6 +92,9 @@ class Firmata:
 			FirmataConstants.STRING_DATA: "",
 			FirmataConstants.SAMPLING_INTERVAL: 19
 		}
+
+		# callback registry for Firmata data events, e.g., digital or analog reports
+		self.callbacks = FirmataEvents()
 
 		# flags to see if we're waiting for a response to a query
 		self.PENDING_ANALOG_MAPPING_RESPONSE = False
@@ -165,6 +200,7 @@ class Firmata:
 				FirmataConstants.STRING_DATA: "",
 				FirmataConstants.SAMPLING_INTERVAL: 19
 			}
+			self.callbacks = FirmataEvents()
 			self._device.close()
 			self._connection_state = False
 			print(f"Disconnected Firmata device at {self._port}")
@@ -457,15 +493,14 @@ class Firmata:
 		# determine the port based on the initial message byte
 		port = _port_from_data(incoming)
 		# read the LSB and MSB from
-		LSB, MSB = await self._device.read_async(size=2)
+		LSB, MSB = await self._device.read_async(size=2) # type: ignore
 		data = (MSB << 7) + LSB
-		self._digital_ports[port] = data
-		# print(f"MSB: {MSB}, LSB: {LSB} ({data})")
-		# start = port * 8
-		# for pin in range(start, start + 8):
-		# 	value = data & 0x01
-		# 	print(pin, value)
-		# 	data >>= 1
+		start = port * 8
+		# emit events for incoming pin data
+		for pin in range(start, start + 8):
+			value = data & 0x01
+			await self.callbacks.handle_event(pin, FirmataConstants.DIGITAL_MESSAGE, port, value)
+			data >>= 1
 
 	# analog pin operations	
 	async def set_analog_pin_reporting(self, pin, enable=True):
@@ -494,7 +529,11 @@ class Firmata:
 			await self._firmata_sysex_command(FirmataConstants.EXTENDED_ANALOG, data)
 
 	async def _analog_event_handler(self, incoming):
-		pass
+		pin = incoming - 210
+		# read the LSB and MSB from
+		LSB, MSB = await self._device.read_async(size=2)  # type: ignore
+		data = (MSB << 7) + LSB
+		await self.callbacks.handle_event(pin, FirmataConstants.ANALOG_MESSAGE, value=data)
 
 	def _translate_analog_pin(self, analog_pin:str) -> int:
 		try:
