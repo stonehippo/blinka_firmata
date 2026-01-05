@@ -360,17 +360,29 @@ class Firmata:
 	async def _build_sysex_firmware(self) -> str:
 		# get the firmware version number before the rest
 		fw_major, fw_minor = bytearray(await self._device.read_async(size=2))
-		
-		sysex = await self._build_sysex()
-		s = "".join(chr(c) for c in sysex)
-		s = f"{fw_major}.{fw_minor} {s}"
-
+		sysex = await self._build_sysex_string()
+		s = f"{fw_major}.{fw_minor} {sysex}"
 		return s
 
+	'''
+	Firmata sends strings as two bytes per character, LSB then MSB.
+	'''
 	async def _build_sysex_string(self) -> str:
-		sysex = await self._build_sysex()
-		s = "".join(chr(c) for c in sysex)
+		sysex = []
+		incoming = None
+		lsb = None
+		msb = None
 
+		while incoming is not FirmataConstants.END_SYSEX:
+			incoming = ord(await self._device.read_async())
+			if incoming is FirmataConstants.END_SYSEX:
+				break
+			else:
+				lsb = incoming
+				msb = ord(await self._device.read_async())
+				sysex.append(lsb + msb)
+
+		s = "".join(chr(c) for c in sysex)
 		return s
 		
 	async def _build_sysex_sampling_interval(self) -> int:
