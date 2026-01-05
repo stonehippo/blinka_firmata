@@ -30,8 +30,6 @@ from blinka_firmata.firmata_constants import FirmataConstants
 
 from typing import Optional
 
-STARTUP_DELAY = 4.0
-
 class FirmataEvents:
 	def __init__(self) -> None:
 		self._registry = {
