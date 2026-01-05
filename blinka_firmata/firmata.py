@@ -227,7 +227,7 @@ class Firmata:
 					await self._check_firmata_protocol()
 			except asyncio.TimeoutError:
 				# we seem to have connected, but got no Sysex responses
-				if self.CONNECTED_WITHOUT_SYSEX:
+				if self.CONNECTED_WITHOUT_SYSEX and self.firmata_protocol != "":
 					print("This Firmata does not support Sysex")
 				else:
 					await self.disconnect()
