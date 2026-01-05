@@ -100,6 +100,9 @@ class Firmata:
 		self.PENDING_PIN_STATE_RESPONSE = False
 		self.PENDING_SAMPLING_INTERVAL_QUERY = False
 
+		# flag to set if Firmata connects, but does not seem to have sysex support
+		self.CONNECTED_WITHOUT_SYSEX = False
+
 		# digital port data	
 		self._digital_ports = [0x00, 0x00, 0x00,
 						 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
@@ -188,6 +191,7 @@ class Firmata:
 			self.PENDING_CAPABILITY_RESPONSE = False
 			self.PENDING_PIN_STATE_RESPONSE = False
 			self.PENDING_SAMPLING_INTERVAL_QUERY = False
+			self.CONNECTED_WITHOUT_SYSEX = False
 			self._report_data = {
 				FirmataConstants.ANALOG_MAPPING_RESPONSE: None,
 				FirmataConstants.CAPABILITY_RESPONSE: None,
@@ -222,9 +226,13 @@ class Firmata:
 				async with asyncio.timeout(timeout):
 					await self._check_firmata_protocol()
 			except asyncio.TimeoutError:
-				await self.disconnect()
-				print(f"Device at {self._port} is not running Firmata")
-				raise ConnectionAbortedError(f"Closed connection to {self._port}")
+				# we seem to have connected, but got no Sysex responses
+				if self.CONNECTED_WITHOUT_SYSEX:
+					print("This Firmata does not support Sysex")
+				else:
+					await self.disconnect()
+					print(f"Device at {self._port} is not running Firmata")
+					raise ConnectionAbortedError(f"Closed connection to {self._port}")
 
 		except SerialException:
 			print(f"Failed to connect to {self._port}")
@@ -241,8 +249,12 @@ class Firmata:
 		while self._report_data.get(FirmataConstants.REPORT_FIRMWARE) == "":
 			await asyncio.sleep(0)
 		print(f"Firmata firmware: {self.firmata_firmware}")
+		# Ok, we got some firmware info, but we haven't confirmed that Sysex can be received by Firmata
+		self.CONNECTED_WITHOUT_SYSEX = True
 		# Let's query the firmware to see what's available
 		await self.get_capability_map()
+		# if we get here before timeout, the Sysex is working and we can clear the flag
+		self.CONNECTED_WITHOUT_SYSEX = False
 		await self.get_analog_map()
 		self._connection_state = True
 			
