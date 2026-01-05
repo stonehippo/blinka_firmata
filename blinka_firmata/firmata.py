@@ -113,7 +113,7 @@ class Firmata:
 	@port.setter
 	def port(self, value:str):
 		if self._connection_state:
-			raise ConnectionError("Cannot chance port while connected")
+			raise ConnectionError("Cannot change port while connected")
 		self._port = value
 
 	@property
@@ -169,15 +169,14 @@ class Firmata:
 	def loop(self, value: Optional[asyncio.AbstractEventLoop]):
 		self._loop = value
 
-	async def connect(self, find_timeout=5):
+	async def connect(self, timeout=5):
 		if self._port:
-			await self._connect_firmata()
-		else:
 			try:
-				async with asyncio.timeout(find_timeout):
-					await self._find_firmata()
-			except TimeoutError:
-				print(f"Timed out trying to detect a device with Firmata after {find_timeout} seconds")
+				await self._connect_device(timeout)
+			except ConnectionAbortedError:
+				pass
+		else:
+			await self._find_firmata(timeout)
 
 	async def disconnect(self):
 		try:
@@ -203,7 +202,7 @@ class Firmata:
 			self._connection_state = False
 			print(f"Disconnected Firmata device at {self._port}")
 
-	async def _connect_firmata(self):
+	async def _connect_device(self, timeout):
 		print(f"Connecting to {self._port}…")
 		try:
 			self._device = aioserial.AioSerial(
@@ -216,25 +215,39 @@ class Firmata:
 			self._data_handler_task = self.loop.create_task(self._firmata_data_handler())
 
 			# try to get Firmata info
-			print("Attempting to get Firmata firmware protocol version…")
-			self._firmata_protocol = await self.report_version()
-			
-			if self._firmata_protocol is not None:
-				while self._report_data.get(FirmataConstants.REPORT_VERSION) == "":
-					await asyncio.sleep(0)
-				print(f"Connected to Firmata device at {self._port} with protocol version {self.firmata_protocol}")
-				# Let's query the firmware to see what's available
-				await self.get_capability_map()
-				await self.get_analog_map()
-				self._connection_state = True
-			else:
+			# on connection, Firmata sends responses for protocol and firmware version 
+			# unprompted. We'll wait for a bit to see if these show up. If not, we'll
+			# timeout and disconnect.
+			try:
+				async with asyncio.timeout(timeout):
+					await self._check_firmata_protocol()
+			except asyncio.TimeoutError:
 				await self.disconnect()
 				print(f"Device at {self._port} is not running Firmata")
+				raise ConnectionAbortedError(f"Closed connection to {self._port}")
+
 		except SerialException:
 			print(f"Failed to connect to {self._port}")
 			pass
 
-	async def _find_firmata(self):
+	'''
+	
+	'''		
+	async def _check_firmata_protocol(self):
+		print("Waiting to get Firmata firmware protocol version…")
+		while self._report_data.get(FirmataConstants.REPORT_VERSION) == "":
+			await asyncio.sleep(0)
+		print(f"Connected to Firmata device at {self._port} with protocol version {self.firmata_protocol}")
+		while self._report_data.get(FirmataConstants.REPORT_FIRMWARE) == "":
+			await asyncio.sleep(0)
+		print(f"Firmata firmware: {self.firmata_firmware}")
+		# Let's query the firmware to see what's available
+		await self.get_capability_map()
+		await self.get_analog_map()
+		self._connection_state = True
+			
+
+	async def _find_firmata(self, timeout):
 		print("Checking for Firmata devices…")
 		ports = list_ports.comports()
 		# Find candidate devices
@@ -243,10 +256,13 @@ class Firmata:
 				# Open the candidate port and see if it could be a Firmata device
 				print(f"Trying {port.device}…")
 				self._port = port.device
-				await self._connect_firmata()
-				if self._firmata_protocol is not None:
+				try:
+					await self._connect_device(timeout)
+					if self.firmata_protocol is not None:
 					# ok, we found a Firmata device, we're going to stop looking
-					break
+						break
+				except Exception:
+					pass
 
 	# basic command sender
 	async def _firmata_command(self, command):
@@ -366,16 +382,16 @@ class Firmata:
 		"""
 		Query the Firmata protocol version supported by the firmware
 		"""
-		return await self._firmata_command(FirmataConstants.REPORT_FIRMWARE)
+		return await self._firmata_command((FirmataConstants.REPORT_VERSION).to_bytes())
 
 	async def report_firmware(self):
 		"""
 		Query the name and version of the firmware
 		"""
-		return await self._firmata_sysex_command(FirmataConstants.REPORT_FIRMWARE)
+		return await self._firmata_sysex_command((FirmataConstants.REPORT_FIRMWARE).to_bytes())
 	
 	async def reset_firmata(self):
-		await self._firmata_command(FirmataConstants.SYSTEM_RESET)
+		await self._firmata_command((FirmataConstants.SYSTEM_RESET).to_bytes())
 		await asyncio.sleep(self._reset_period)
 
 	async def set_sampling_interval(self, interval:int):
