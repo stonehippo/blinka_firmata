@@ -398,7 +398,7 @@ class Firmata:
 		return s
 		
 	async def _build_sysex_sampling_interval(self) -> int:
-		sysex = await self._build_sysex
+		sysex = await self._build_sysex()
 		return sysex[0] + (sysex[1] << 7)
 
 	# firmware info and control
