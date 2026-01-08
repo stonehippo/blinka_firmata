@@ -355,6 +355,9 @@ class Firmata:
 			self.PENDING_SAMPLING_INTERVAL_QUERY = False
 			return self._build_sysex_sampling_interval
 		
+		if report_type == FirmataConstants.I2C_REPLY:
+			return self._build_sysex_i2c
+		
 		return self._build_sysex
 	
 	async def _build_sysex(self) -> list:
@@ -400,6 +403,17 @@ class Firmata:
 	async def _build_sysex_sampling_interval(self) -> int:
 		sysex = await self._build_sysex()
 		return sysex[0] + (sysex[1] << 7)
+	
+	async def _build_sysex_i2c(self) -> dict:
+		# the first two bytes are the I2C device address
+		addr_lsb, addr_msb = bytearray(await self._device.read_async(size=2))
+		addr = (addr_msb << 7) + addr_lsb
+		# next two bytes are the register address
+		reg_lsb, reg_msb = bytearray(await self._device.read_async(size=2))
+		reg = (reg_msb << 7) + reg_lsb
+		# all other bytes are data
+		sysex = await self._build_sysex()
+		return {"addr": addr, "reg": reg, "data": sysex}
 
 	# firmware info and control
 	async def report_version(self):
@@ -582,6 +596,11 @@ class Firmata:
 				raise Exception(f"{analog_pin} is not a valid analog pin")
 		except:
 			raise Exception(f"{analog_pin} is not a valid analog pin")
+
+	# I2C operations
+	async def _i2c_request(self, address:int, data:tuple, mode:int=FirmataConstants.I2C_MODE_WRITE, auto_restart:bool=False):
+		request_data = []
+		await self._firmata_sysex_command(FirmataConstants.I2C_REQUEST, request_data)
 
 # utility functions
 def _pin_port_and_mask(pin:int) -> tuple:

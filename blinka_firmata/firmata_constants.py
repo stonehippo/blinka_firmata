@@ -90,3 +90,9 @@ class FirmataConstants:
 	# port ranges for digital and analog messages
 	DIGITAL_MESSAGE_PORTS = range(DIGITAL_MESSAGE, DIGITAL_MESSAGE + 16)
 	ANALOG_MESSAGE_PINS = range(ANALOG_MESSAGE, ANALOG_MESSAGE + 16)
+
+	# I2C read/write modes
+	I2C_MODE_WRITE =          0b00
+	I2C_MODE_READ_ONCE =      0b01
+	I2C_MODE_READ_CONT =      0b10
+	I2C_MODE_READ_STOP =      0b11
