@@ -419,15 +419,15 @@ class Firmata:
 		
 	async def _build_sysex_sampling_interval(self) -> int:
 		sysex = await self._build_sysex()
-		return sysex[0] + (sysex[1] << 7)
+		return from_7bit(sysex)
 	
 	async def _build_sysex_i2c(self) -> dict:
 		# the first two bytes are the I2C device address
 		addr_lsb, addr_msb = bytearray(await self._device.read_async(size=2))
-		addr = (addr_msb << 7) + addr_lsb
+		addr = from_7bit([addr_lsb, addr_msb])
 		# next two bytes are the register address
 		reg_lsb, reg_msb = bytearray(await self._device.read_async(size=2))
-		reg = (reg_msb << 7) + reg_lsb
+		reg = from_7bit([reg_lsb, reg_msb])
 		# all other bytes are data
 		sysex = await self._build_sysex()
 		return {"addr": addr, "reg": reg, "data": sysex}
@@ -563,7 +563,7 @@ class Firmata:
 		port = _port_from_data(incoming)
 		# read the LSB and MSB from
 		LSB, MSB = await self._device.read_async(size=2) # type: ignore
-		data = (MSB << 7) + LSB
+		data = from_7bit([LSB, MSB])
 		start = port * 8
 		# emit events for incoming pin data
 		for pin in range(start, start + 8):
@@ -599,9 +599,9 @@ class Firmata:
 
 	async def _analog_event_handler(self, incoming):
 		pin = incoming - 210
-		# read the LSB and MSB from
+		# read the LSB and MSB from the response
 		LSB, MSB = await self._device.read_async(size=2)  # type: ignore
-		data = (MSB << 7) + LSB
+		data = from_7bit([LSB, MSB])
 		await self.callbacks.handle_event(pin, FirmataConstants.ANALOG_MESSAGE, value=data)
 
 	def _translate_analog_pin(self, analog_pin:str) -> int:
