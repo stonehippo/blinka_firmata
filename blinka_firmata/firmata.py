@@ -41,26 +41,28 @@ class FirmataEvents:
 		self._analog_values = {}
 
 	# callback management
-	def subscribe(self, pin, event_type=FirmataConstants.DIGITAL_MESSAGE, handler=None) -> None:
-		self._registry[event_type][pin] = handler
+	def subscribe(self, pin_or_address, event_type=FirmataConstants.DIGITAL_MESSAGE, handler=None) -> None:
+		self._registry[event_type][pin_or_address] = handler
 
-	def unsubscribe(self, pin, event_type=FirmataConstants.DIGITAL_MESSAGE):
-		if pin in self._registry[event_type].keys():
-			self._registry[event_type].pop(pin)
+	def unsubscribe(self, pin_or_address, event_type=FirmataConstants.DIGITAL_MESSAGE):
+		if pin_or_address in self._registry[event_type].keys():
+			self._registry[event_type].pop(pin_or_address)
 
-	async def handle_event(self, pin, event_type=FirmataConstants.DIGITAL_MESSAGE, port=None, value=None):
-		if pin in self._registry[event_type].keys():
+	async def handle_event(self, pin_or_address, event_type=FirmataConstants.DIGITAL_MESSAGE, port=None, value=None):
+		if pin_or_address in self._registry[event_type].keys():
 			if event_type == FirmataConstants.DIGITAL_MESSAGE:
 				# cache the value
-				if pin not in self._digital_values.keys():
-					self._digital_values[pin] = value
-					self._registry[event_type][pin]([pin, value])  # type: ignore	
-				if value != self._digital_values[pin]:
-						self._digital_values[pin] = value
-						self._registry[event_type][pin]([pin, value])  # type: ignore	
+				if pin_or_address not in self._digital_values.keys():
+					self._digital_values[pin_or_address] = value
+					self._registry[event_type][pin_or_address]([pin_or_address, value])  # type: ignore	
+				if value != self._digital_values[pin_or_address]:
+						self._digital_values[pin_or_address] = value
+						self._registry[event_type][pin_or_address]([pin_or_address, value])  # type: ignore	
 			elif event_type == FirmataConstants.ANALOG_MESSAGE:
-				self._analog_values[pin] = value
-				self._registry[event_type][pin]([pin, value])
+				self._analog_values[pin_or_address] = value
+				self._registry[event_type][pin_or_address]([pin_or_address, value])
+			elif event_type == FirmataConstants.I2C_REPLY:
+				pass
 
 class Firmata:
 	def __init__(
@@ -79,6 +81,7 @@ class Firmata:
 		self._loop:Optional[asyncio.AbstractEventLoop] = loop
 		self._data_handler_task:Optional[asyncio.Task] = None
 		self._connection_state:bool = False
+		self.is_i2c_configured = False
 
 		# response data for queries and reports
 		self._report_data = {
@@ -203,6 +206,7 @@ class Firmata:
 			}
 			self.callbacks = FirmataEvents()
 			self._device.close()
+			self.is_i2c_configured = False
 			self._connection_state = False
 			print(f"Disconnected Firmata device at {self._port}")
 
@@ -327,10 +331,14 @@ class Firmata:
 		# what type of sysex is this?
 		incoming = ord(await self._device.read_async())
 		sysex_handler = await self._sysex_handler_factory(incoming)
+		sysex_callback = await self._sysex_callback_factory(incoming)
 
 		sysex = await sysex_handler()
 
 		self._report_data[incoming] = sysex
+		
+		# fire callback for sysex responses, e.g., from an I2C read
+		await sysex_callback(sysex)
 
 	async def _sysex_handler_factory(self, report_type):
 		if report_type == FirmataConstants.REPORT_FIRMWARE:
@@ -360,6 +368,15 @@ class Firmata:
 		
 		return self._build_sysex
 	
+	async def _null_sysex_handler(self, _):
+		pass
+
+	async def _sysex_callback_factory(self, sysex_type):
+		if sysex_type == FirmataConstants.I2C_REPLY:
+			return self._i2c_event_handler
+		
+		return self._null_sysex_handler
+ 
 	async def _build_sysex(self) -> list:
 		sysex = []
 		incoming = None
@@ -435,7 +452,7 @@ class Firmata:
 	async def set_sampling_interval(self, interval:int):
 		if interval < 10:
 			raise ValueError("Sampling interval cannot be less than 10ms")
-		data = [interval & 0x7f, (interval >> 7) & 0x7f]
+		data = to_7bit(interval)
 		await self._firmata_sysex_command(FirmataConstants.SAMPLING_INTERVAL, data)
 		self._sampling_interval_ms = interval
 
@@ -536,7 +553,7 @@ class Firmata:
 				self._digital_ports[port] |= mask
 			else:
 				self._digital_ports[port] &= ~mask
-			command = (FirmataConstants.DIGITAL_MESSAGE + port, self._digital_ports[port] & 0x7f, (self._digital_ports[port] >> 7) & 0x7f)
+			command = [FirmataConstants.DIGITAL_MESSAGE + port] + to_7bit(self._digital_ports[port])
 		else:
 			command = (FirmataConstants.SET_DIGITAL_PIN_VALUE, pin, pin_value)
 		await self._firmata_command(command)
@@ -574,10 +591,10 @@ class Firmata:
 		"""
 		pwm_pin = FirmataConstants.ANALOG_MESSAGE + pin
 		if pwm_pin < 0xf0:
-			command = (pwm_pin, value & 0x7f, (value >> 7) & 0x7f)
+			command = [pwm_pin] + to_7bit(value)
 			await self._firmata_command(command)
 		else:
-			data = [pin, value & 0x7f, (value >> 7) & 0x7f, (value >> 14) & 0x7f]
+			data = [pin] + to_7bit(value) + [(value >> 14) & 0x7f]
 			await self._firmata_sysex_command(FirmataConstants.EXTENDED_ANALOG, data)
 
 	async def _analog_event_handler(self, incoming):
@@ -598,9 +615,26 @@ class Firmata:
 			raise Exception(f"{analog_pin} is not a valid analog pin")
 
 	# I2C operations
-	async def _i2c_request(self, address:int, data:tuple, mode:int=FirmataConstants.I2C_MODE_WRITE, auto_restart:bool=False):
-		request_data = []
-		await self._firmata_sysex_command(FirmataConstants.I2C_REQUEST, request_data)
+	async def _i2c_config(self, delay=0):
+		await self._firmata_sysex_command(FirmataConstants.I2C_CONFIG, to_7bit(delay))
+		self.is_i2c_configured = True
+
+	async def _i2c_request(self, address:int, data:list=[], mode:int=FirmataConstants.I2C_MODE_WRITE, auto_restart:bool=False):
+		if not self.is_i2c_configured:
+			await self._i2c_config()
+		await self._firmata_sysex_command(FirmataConstants.I2C_REQUEST, to_7bit(address) + sum([to_7bit(n) for n in data],[]))
+	
+	async def i2c_read(self, address:int):
+		await self._i2c_request(address, mode=FirmataConstants.I2C_MODE_READ_ONCE)
+
+	async def i2c_write(self, address: int, data:list):
+		
+		await self._i2c_request(address, data=data)
+
+	async def _i2c_event_handler(self, sysex):
+		address = 0x0
+		data = []
+		await self.callbacks.handle_event(address, FirmataConstants.I2C_REPLY, value=data)
 
 # utility functions
 def _pin_port_and_mask(pin:int) -> tuple:
@@ -647,6 +681,12 @@ def _get_analog_pins(amap:Optional[list]=None) -> Optional[tuple]:
 			analog_pins.append(pin)
 	
 	return tuple(analog_pins)
+
+def to_7bit(n):
+	return [n & 0x7f, (n >> 7) & 0x7f]
+
+def from_7bit(n):
+	return n[0] + (n[1] << 7)
 
 def _port_pin_values(port:int, data:int, total_pins:int=20) -> list:
         pin_values = []
