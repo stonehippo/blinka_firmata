@@ -1,15 +1,19 @@
-# pyproject.toml
-
-[build-system]
-requires = ["setuptools>=65.5.0", "wheel"]
-build-backend = "setuptools.build_meta"
-
 [project]
 name = "blinka-firmata"
 version = "0.1.0"
 description = "A lightweight Python client for Firmata"
 readme = "README.md"
-authors = [{ name = "George White", email = "stonehippo@gmail.com" }]
-dependencies = [
-    "aioserial >= 1.3.1",
+authors = [
+    { name = "George White", email = "stonehippo@gmail.com" }
 ]
+requires-python = ">=3.15"
+dependencies = [
+    "aioserial>=1.3.1",
+]
+
+[project.scripts]
+blinka-firmata = "blinka_firmata:main"
+
+[build-system]
+requires = ["uv_build>=0.13.5,<0.14.0"]
+build-backend = "uv_build"
