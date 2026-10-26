@@ -4,7 +4,7 @@ A Python client for the [Firmata Protocol](https://github.com/firmata/protocol/)
 
 This client was written as a layer for [CircuitPython Blinka](https://circuitpython.org/blinka) to allow control of boards running Firmata, such as an Arduino Uno. It can also be used as a standalone module for controlling Firmata devices.
 
-The best way to use this client is with the [ConfigurabFirmata firmware](https://github.com/firmata/ConfigurableFirmata). It has also been tested with StandardFirmata, though that firmaware is a bit out of date and has not been updated to support recent(ish) additions to the Firmata Prototcol. **I really do recommend using ConfigurableFirmata**. Other Firmata-compatible firmware should work, possibly requiring some modifications to this library. Contributions for additional support are welcome.
+The best way to use this client is with the [ConfigurabFirmata firmware](https://github.com/firmata/ConfigurableFirmata). It has also been tested with StandardFirmata, though that firmware is a bit out of date and has not been updated to support recent(ish) additions to the Firmata Prototcol. **I really do recommend using ConfigurableFirmata**. Other Firmata-compatible firmware should work, possibly requiring some modifications to this library. Contributions for additional support are welcome.
 
 ## Adding Firmata Support to Blinka
 
