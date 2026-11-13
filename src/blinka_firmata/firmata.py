@@ -1,5 +1,5 @@
 '''
-Copyright (c) 2025 George White
+Copyright (c) 2025-2026 George White
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -27,42 +27,10 @@ from serial.tools import list_ports
 from serial.serialutil import SerialException
 
 from blinka_firmata.firmata_constants import FirmataConstants
+from blinka_firmata.firmata_events import FirmataEvents
+from blinka_firmata.firmata_utility import *
 
 from typing import Optional
-
-class FirmataEvents:
-	def __init__(self) -> None:
-		self._registry = {
-			FirmataConstants.ANALOG_MESSAGE: {},
-			FirmataConstants.DIGITAL_MESSAGE: {}
-		}
-		# caches for previous values received
-		self._digital_values = {}
-		self._analog_values = {}
-
-	# callback management
-	def subscribe(self, pin_or_address, event_type=FirmataConstants.DIGITAL_MESSAGE, handler=None) -> None:
-		self._registry[event_type][pin_or_address] = handler
-
-	def unsubscribe(self, pin_or_address, event_type=FirmataConstants.DIGITAL_MESSAGE):
-		if pin_or_address in self._registry[event_type].keys():
-			self._registry[event_type].pop(pin_or_address)
-
-	async def handle_event(self, pin_or_address, event_type=FirmataConstants.DIGITAL_MESSAGE, port=None, value=None):
-		if pin_or_address in self._registry[event_type].keys():
-			if event_type == FirmataConstants.DIGITAL_MESSAGE:
-				# cache the value
-				if pin_or_address not in self._digital_values.keys():
-					self._digital_values[pin_or_address] = value
-					self._registry[event_type][pin_or_address]([pin_or_address, value])  # type: ignore	
-				if value != self._digital_values[pin_or_address]:
-						self._digital_values[pin_or_address] = value
-						self._registry[event_type][pin_or_address]([pin_or_address, value])  # type: ignore	
-			elif event_type == FirmataConstants.ANALOG_MESSAGE:
-				self._analog_values[pin_or_address] = value
-				self._registry[event_type][pin_or_address]([pin_or_address, value])
-			elif event_type == FirmataConstants.I2C_REPLY:
-				pass
 
 class Firmata:
 	def __init__(
@@ -150,7 +118,7 @@ class Firmata:
 	
 	@property
 	def readable_capability_map(self) -> Optional[dict]:
-		return _translate_capability_map(self.capability_map)
+		return translate_capability_map(self.capability_map)
 	
 	@property
 	def analog_map(self) -> Optional[list]:
@@ -158,7 +126,7 @@ class Firmata:
 	
 	@property
 	def analog_pins(self) -> Optional[tuple]:
-		return _get_analog_pins(self.analog_map)
+		return get_analog_pins(self.analog_map)
 
 	@property
 	def sampling_interval_ms(self) -> int:
@@ -526,7 +494,7 @@ class Firmata:
 
 	# digital pin operations
 	async def set_digital_port_reporting(self, pin: int, enable:bool=True):
-		port, _ = _pin_port_and_mask(pin)
+		port, _ = pin_port_and_mask(pin)
 		if enable:
 			command = (FirmataConstants.REPORT_DIGITAL + port, 1)
 		else:
@@ -548,7 +516,7 @@ class Firmata:
 			pin_value = 1
 		
 		if use_port:
-			port, mask = _pin_port_and_mask(pin)
+			port, mask = pin_port_and_mask(pin)
 			if pin_value == 1:
 				self._digital_ports[port] |= mask
 			else:
@@ -560,7 +528,7 @@ class Firmata:
 	
 	async def _digital_event_handler(self, incoming):
 		# determine the port based on the initial message byte
-		port = _port_from_data(incoming)
+		port = port_from_data(incoming)
 		# read the LSB and MSB from
 		LSB, MSB = await self._device.read_async(size=2) # type: ignore
 		data = from_7bit([LSB, MSB])
@@ -628,73 +596,9 @@ class Firmata:
 		await self._i2c_request(address, mode=FirmataConstants.I2C_MODE_READ_ONCE)
 
 	async def i2c_write(self, address: int, data:list):
-		
 		await self._i2c_request(address, data=data)
 
 	async def _i2c_event_handler(self, sysex):
 		address = 0x0
 		data = []
 		await self.callbacks.handle_event(address, FirmataConstants.I2C_REPLY, value=data)
-
-# utility functions
-def _pin_port_and_mask(pin:int) -> tuple:
-	return (pin // 8, 1 << (pin % 8))
-
-def _port_from_data(data:int) -> int:
-	return data & 0x0f
-
-def _translate_capability_map(cmap:Optional[list]=None) -> Optional[dict]:
-	"""
-	Create a human-readable version of the capability map sent by the firmaware
-	"""
-	if cmap is None:
-		return
-	
-	MODES = ["DIGITAL_INPUT","DIGITAL_OUTPUT","ANALOG_INPUT","PWM","SERVO","SHIFT","I2C","ONEWIRE","STEPPER","ENCODER","SERIAL","INPUT_PULLUP","SPI","SONAR","TONE","DHT","FREQUENCY"]
-	pin:int = 0
-	tmap:dict = {}
-	caps:list = []
-	cap = True # flip flop betwen the capability and its resolution
-	
-	for item in cmap:
-		if item == 127: # this is the end of a pins capablities
-			tmap[f"pin_{pin}"] = caps
-			caps = []
-			pin = pin + 1
-		else:
-			if cap:
-				item = MODES[item]
-				cap = False
-			else:
-				cap = True
-			caps.append(item)
-
-	return tmap
-
-def _get_analog_pins(amap:Optional[list]=None) -> Optional[tuple]:
-	if amap is None:
-		return
-	analog_pins = []
-
-	for pin in range(0, len(amap)):
-		if amap[pin] != 127:
-			analog_pins.append(pin)
-	
-	return tuple(analog_pins)
-
-def to_7bit(n):
-	return [n & 0x7f, (n >> 7) & 0x7f]
-
-def from_7bit(n):
-	return n[0] + (n[1] << 7)
-
-def _port_pin_values(port:int, data:int, total_pins:int=20) -> list:
-        pin_values = []
-        pins_per_port = 8
-        start_pin = port * pins_per_port
-        stop_pin = min(total_pins, port * pins_per_port + pins_per_port)
-        for pin in range(start_pin, stop_pin):
-                value = data & 0x01
-                pin_values.append(value)
-                data >>= 1
-        return pin_values
