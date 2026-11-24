@@ -32,6 +32,11 @@ from blinka_firmata.firmata_utility import *
 
 from typing import Optional
 
+import logging
+logger = logging.getLogger(__name__)
+log_numeric_level = getattr(logging, '', logging.INFO)
+logging.basicConfig(level=log_numeric_level)
+
 class Firmata:
 	def __init__(
 			self,
@@ -176,10 +181,10 @@ class Firmata:
 			self._device.close() # type: ignore
 			self.is_i2c_configured = False
 			self._connection_state = False
-			print(f"Disconnected Firmata device at {self._port}")
+			logger.info(f"Disconnected Firmata device at {self._port}")
 
 	async def _connect_device(self, timeout):
-		print(f"Connecting to {self._port}…")
+		logger.info(f"Connecting to {self._port}…")
 		try:
 			self._device = aioserial.AioSerial(
 				port=self._port,
@@ -200,27 +205,27 @@ class Firmata:
 			except asyncio.TimeoutError:
 				# we seem to have connected, but got no Sysex responses
 				if self.CONNECTED_WITHOUT_SYSEX and self.firmata_protocol != "":
-					print("This Firmata does not support Sysex")
+					logger.warning("This Firmata does not support Sysex")
 				else:
-					await self.disconnect()
-					print(f"Device at {self._port} is not running Firmata")
+					# await self.disconnect()
+					logger.error(f"Device at {self._port} is not running Firmata")
 					raise ConnectionAbortedError(f"Closed connection to {self._port}")
 
 		except SerialException:
-			print(f"Failed to connect to {self._port}")
+			logger.error(f"Failed to connect to {self._port}")
 			pass
 
 	'''
 	
 	'''		
 	async def _check_firmata_protocol(self):
-		print("Waiting to get Firmata firmware protocol version…")
+		logger.info("Waiting to get Firmata firmware protocol version…")
 		while self._report_data.get(FirmataConstants.REPORT_VERSION) == "":
 			await asyncio.sleep(0)
-		print(f"Connected to Firmata device at {self._port} with protocol version {self.firmata_protocol}")
+		logger.info(f"Connected to Firmata device at {self._port} with protocol version {self.firmata_protocol}")
 		while self._report_data.get(FirmataConstants.REPORT_FIRMWARE) == "":
 			await asyncio.sleep(0)
-		print(f"Firmata firmware: {self.firmata_firmware}")
+		logger.info(f"Firmata firmware: {self.firmata_firmware}")
 		# Ok, we got some firmware info, but we haven't confirmed that Sysex can be received by Firmata
 		self.CONNECTED_WITHOUT_SYSEX = True
 		# Let's query the firmware to see what's available
@@ -232,13 +237,13 @@ class Firmata:
 			
 
 	async def _find_firmata(self, timeout):
-		print("Checking for Firmata devices…")
+		logger.info("Checking for Firmata devices…")
 		ports = list_ports.comports()
 		# Find candidate devices
 		for port in ports:
 			if port.pid is not None:
 				# Open the candidate port and see if it could be a Firmata device
-				print(f"Trying {port.device}…")
+				logger.info(f"Trying {port.device}…")
 				self._port = port.device
 				try:
 					await self._connect_device(timeout)
@@ -263,6 +268,7 @@ class Firmata:
 		sysex_command = [FirmataConstants.START_SYSEX, command, FirmataConstants.END_SYSEX]
 		# splice data into the command
 		sysex_command[2:1] = data
+		logger.info(f"Sending sysex {[f"{x:08b}" for x in sysex_command]}")
 		await self._firmata_command(sysex_command)
 
 	# event handler for incoming data from the firmware
