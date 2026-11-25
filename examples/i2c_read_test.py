@@ -15,7 +15,6 @@ register = 0x19
 
 # A simple callback that just prints the data received from firmata.
 def echo(data):
-
     print(f"I2C reply from {hex(data[0])} (register {hex(data[-1])}): {from_7bit(data[1])}")
 
 async def read(count=3, delay=0.25):
