@@ -6,6 +6,7 @@ https://www.sparkfun.com/sparkfun-qwiic-button-breakout.html
 import asyncio
 from blinka_firmata.firmata import Firmata
 from blinka_firmata.firmata_constants import FirmataConstants
+from blinka_firmata.firmata_utility import from_7bit
 
 board = Firmata()
 
@@ -14,7 +15,8 @@ register = 0x19
 
 # A simple callback that just prints the data received from firmata.
 def echo(data):
-    print(f"Data returned in I2C reply: {data}")
+
+    print(f"I2C reply from {hex(data[0])} (register {hex(data[-1])}): {from_7bit(data[1])}")
 
 async def read(count=3, delay=0.25):
     board.callbacks.subscribe(i2c_address, FirmataConstants.I2C_REPLY, echo)
