@@ -34,7 +34,7 @@ from typing import Optional
 
 import logging
 logger = logging.getLogger(__name__)
-log_numeric_level = getattr(logging, '', logging.INFO)
+log_numeric_level = getattr(logging, '', logging.WARNING)
 logging.basicConfig(level=log_numeric_level)
 
 class Firmata:
