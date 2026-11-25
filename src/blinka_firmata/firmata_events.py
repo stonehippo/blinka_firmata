@@ -30,7 +30,8 @@ class FirmataEvents:
 	def __init__(self) -> None:
 		self._registry = {
 			FirmataConstants.ANALOG_MESSAGE: {},
-			FirmataConstants.DIGITAL_MESSAGE: {}
+			FirmataConstants.DIGITAL_MESSAGE: {},
+			FirmataConstants.I2C_REPLY: {},
 		}
 		# caches for previous values received
 		self._digital_values = {}
@@ -44,7 +45,7 @@ class FirmataEvents:
 		if pin_or_address in self._registry[event_type].keys():
 			self._registry[event_type].pop(pin_or_address)
 
-	async def handle_event(self, pin_or_address, event_type=FirmataConstants.DIGITAL_MESSAGE, port=None, value=None):
+	async def handle_event(self, pin_or_address, event_type=FirmataConstants.DIGITAL_MESSAGE, register=None, port=None, value=None):
 		if pin_or_address in self._registry[event_type].keys():
 			if event_type == FirmataConstants.DIGITAL_MESSAGE:
 				# cache the value
@@ -58,4 +59,4 @@ class FirmataEvents:
 				self._analog_values[pin_or_address] = value
 				self._registry[event_type][pin_or_address]([pin_or_address, value])
 			elif event_type == FirmataConstants.I2C_REPLY:
-				pass
+				self._registry[event_type][pin_or_address]([pin_or_address, value, register])

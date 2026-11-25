@@ -268,7 +268,6 @@ class Firmata:
 		sysex_command = [FirmataConstants.START_SYSEX, command, FirmataConstants.END_SYSEX]
 		# splice data into the command
 		sysex_command[2:1] = data
-		logger.info(f"Sending sysex {[f"{x:08b}" for x in sysex_command]}")
 		await self._firmata_command(sysex_command)
 
 	# event handler for incoming data from the firmware
@@ -308,7 +307,6 @@ class Firmata:
 		sysex_callback = await self._sysex_callback_factory(incoming)
 
 		sysex = await sysex_handler()
-
 		self._report_data[incoming] = sysex
 		
 		# fire callback for sysex responses, e.g., from an I2C read
@@ -589,22 +587,55 @@ class Firmata:
 			raise Exception(f"{analog_pin} is not a valid analog pin")
 
 	# I2C operations
-	async def _i2c_config(self, delay=0):
+	async def i2c_config(self, delay=0):
 		await self._firmata_sysex_command(FirmataConstants.I2C_CONFIG, to_7bit(delay))
 		self.is_i2c_configured = True
 
-	async def _i2c_request(self, address:int, data:list=[], mode:int=FirmataConstants.I2C_MODE_WRITE, auto_restart:bool=False):
+	async def _i2c_request(
+			self,
+			address:int,
+			register:Optional[int] = None,
+			data:tuple=(),
+			number_of_bytes:Optional[int] = None,
+			mode:int=FirmataConstants.I2C_MODE_WRITE,
+			auto_restart:bool=False):
 		if not self.is_i2c_configured:
-			await self._i2c_config()
-		await self._firmata_sysex_command(FirmataConstants.I2C_REQUEST, to_7bit(address) + sum([to_7bit(n) for n in data],[]))
+			await self.i2c_config()
+		preamble = [address, mode]
+		if register is not None:
+			preamble = preamble + to_7bit(register)
+		if number_of_bytes is not None:
+			preamble = preamble + to_7bit(number_of_bytes)
+		to_send = preamble + sum([to_7bit(n) for n in data],[])
+		await self._firmata_sysex_command(FirmataConstants.I2C_REQUEST, to_send )
 	
-	async def i2c_read(self, address:int):
-		await self._i2c_request(address, mode=FirmataConstants.I2C_MODE_READ_ONCE)
+	async def i2c_read(self, address:int, register: int, number_of_bytes:int):
+		await self._i2c_request(
+			address,
+			register=register,
+			number_of_bytes=number_of_bytes,
+			mode=FirmataConstants.I2C_MODE_READ_ONCE)
 
-	async def i2c_write(self, address: int, data:list):
+	async def i2c_read_continous(self, address:int, register:int, number_of_bytes:int):
+		await self._i2c_request(
+			address,
+			register=register,
+			number_of_bytes=number_of_bytes,
+			mode=FirmataConstants.I2C_MODE_READ_CONT)
+
+	async def i2c_read_stop(self, address:int, register:int):
+		data = (register,)
+		await self._i2c_request(address, register=register, mode=FirmataConstants.I2C_MODE_READ_STOP)
+
+	async def i2c_write(self, address: int, data:tuple):
 		await self._i2c_request(address, data=data)
 
 	async def _i2c_event_handler(self, sysex):
-		address = 0x0
-		data = []
-		await self.callbacks.handle_event(address, FirmataConstants.I2C_REPLY, value=data)
+		address = sysex['addr']
+		register = sysex['reg']
+		data = sysex['data']
+		try:
+			await self.callbacks.handle_event(address, FirmataConstants.I2C_REPLY, register=register, value=data)
+		except:
+			logger.info(f"No handler registered for I2C_REPLAY for address {address}")
+			pass
