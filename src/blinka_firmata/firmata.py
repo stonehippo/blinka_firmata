@@ -639,3 +639,15 @@ class Firmata:
 		except:
 			logger.info(f"No handler registered for I2C_REPLAY for address {address}")
 			pass
+
+	# Servo operations
+	# Set up a pin for servo operation, including optionally taking care of setting the pin mode
+	async def servo_config(self, pin:int, min_pulse:int=544, max_pulse:int=2400, set_pin_mode:bool=False):
+		servo_config = [pin] + to_7bit(min_pulse) + to_7bit(max_pulse)
+		await self._firmata_sysex_command(FirmataConstants.SERVO_CONFIG, servo_config)
+		if set_pin_mode:
+			await self.set_pin_mode(pin, FirmataConstants.PIN_MODE_SERVO)
+
+	# as alias for the standard analog message method
+	async def servo_write(self, pin:int, position:int):
+		await self.pwm_write(pin, position)
