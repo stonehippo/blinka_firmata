@@ -21,7 +21,6 @@ levels = [int(map_range(cos(x/10), -1.0, 1.0, 0, 255)) for x in range(0,360)]
 async def main():
     await board.connect()
     await board.set_pin_mode(pwm_pin, FirmataConstants.PIN_MODE_PWM)
-    a = 0.0
     while True:
         for level in levels:
             await board.pwm_write(pwm_pin, level)
