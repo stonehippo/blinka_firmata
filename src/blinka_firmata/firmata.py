@@ -1,5 +1,5 @@
 '''
-Copyright (c) 2025 George White
+Copyright (c) 2025-2026 George White
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -27,40 +27,15 @@ from serial.tools import list_ports
 from serial.serialutil import SerialException
 
 from blinka_firmata.firmata_constants import FirmataConstants
+from blinka_firmata.firmata_events import FirmataEvents
+from blinka_firmata.firmata_utility import *
 
 from typing import Optional
 
-class FirmataEvents:
-	def __init__(self) -> None:
-		self._registry = {
-			FirmataConstants.ANALOG_MESSAGE: {},
-			FirmataConstants.DIGITAL_MESSAGE: {}
-		}
-		# caches for previous values received
-		self._digital_values = {}
-		self._analog_values = {}
-
-	# callback management
-	def subscribe(self, pin, event_type=FirmataConstants.DIGITAL_MESSAGE, handler=None) -> None:
-		self._registry[event_type][pin] = handler
-
-	def unsubscribe(self, pin, event_type=FirmataConstants.DIGITAL_MESSAGE):
-		if pin in self._registry[event_type].keys():
-			self._registry[event_type].pop(pin)
-
-	async def handle_event(self, pin, event_type=FirmataConstants.DIGITAL_MESSAGE, port=None, value=None):
-		if pin in self._registry[event_type].keys():
-			if event_type == FirmataConstants.DIGITAL_MESSAGE:
-				# cache the value
-				if pin not in self._digital_values.keys():
-					self._digital_values[pin] = value
-					self._registry[event_type][pin]([pin, value])  # type: ignore	
-				if value != self._digital_values[pin]:
-						self._digital_values[pin] = value
-						self._registry[event_type][pin]([pin, value])  # type: ignore	
-			elif event_type == FirmataConstants.ANALOG_MESSAGE:
-				self._analog_values[pin] = value
-				self._registry[event_type][pin]([pin, value])
+import logging
+logger = logging.getLogger(__name__)
+log_numeric_level = getattr(logging, '', logging.WARNING)
+logging.basicConfig(level=log_numeric_level)
 
 class Firmata:
 	def __init__(
@@ -79,6 +54,7 @@ class Firmata:
 		self._loop:Optional[asyncio.AbstractEventLoop] = loop
 		self._data_handler_task:Optional[asyncio.Task] = None
 		self._connection_state:bool = False
+		self.is_i2c_configured = False
 
 		# response data for queries and reports
 		self._report_data = {
@@ -147,7 +123,7 @@ class Firmata:
 	
 	@property
 	def readable_capability_map(self) -> Optional[dict]:
-		return _translate_capability_map(self.capability_map)
+		return translate_capability_map(self.capability_map)
 	
 	@property
 	def analog_map(self) -> Optional[list]:
@@ -155,7 +131,7 @@ class Firmata:
 	
 	@property
 	def analog_pins(self) -> Optional[tuple]:
-		return _get_analog_pins(self.analog_map)
+		return get_analog_pins(self.analog_map)
 
 	@property
 	def sampling_interval_ms(self) -> int:
@@ -183,7 +159,7 @@ class Firmata:
 
 	async def disconnect(self):
 		try:
-			await self._data_handler_task.cancel()
+			await self._data_handler_task.cancel() # type: ignore
 		except:
 			pass
 		finally:
@@ -202,12 +178,13 @@ class Firmata:
 				FirmataConstants.SAMPLING_INTERVAL: 19
 			}
 			self.callbacks = FirmataEvents()
-			self._device.close()
+			self._device.close() # type: ignore
+			self.is_i2c_configured = False
 			self._connection_state = False
-			print(f"Disconnected Firmata device at {self._port}")
+			logger.info(f"Disconnected Firmata device at {self._port}")
 
 	async def _connect_device(self, timeout):
-		print(f"Connecting to {self._port}…")
+		logger.info(f"Connecting to {self._port}…")
 		try:
 			self._device = aioserial.AioSerial(
 				port=self._port,
@@ -216,7 +193,7 @@ class Firmata:
 				write_timeout=0
 			)
 
-			self._data_handler_task = self.loop.create_task(self._firmata_data_handler())
+			self._data_handler_task = self.loop.create_task(self._firmata_data_handler()) # type: ignore
 
 			# try to get Firmata info
 			# on connection, Firmata sends responses for protocol and firmware version 
@@ -228,27 +205,27 @@ class Firmata:
 			except asyncio.TimeoutError:
 				# we seem to have connected, but got no Sysex responses
 				if self.CONNECTED_WITHOUT_SYSEX and self.firmata_protocol != "":
-					print("This Firmata does not support Sysex")
+					logger.warning("This Firmata does not support Sysex")
 				else:
-					await self.disconnect()
-					print(f"Device at {self._port} is not running Firmata")
+					# await self.disconnect()
+					logger.error(f"Device at {self._port} is not running Firmata")
 					raise ConnectionAbortedError(f"Closed connection to {self._port}")
 
 		except SerialException:
-			print(f"Failed to connect to {self._port}")
+			logger.error(f"Failed to connect to {self._port}")
 			pass
 
 	'''
 	
 	'''		
 	async def _check_firmata_protocol(self):
-		print("Waiting to get Firmata firmware protocol version…")
+		logger.info("Waiting to get Firmata firmware protocol version…")
 		while self._report_data.get(FirmataConstants.REPORT_VERSION) == "":
 			await asyncio.sleep(0)
-		print(f"Connected to Firmata device at {self._port} with protocol version {self.firmata_protocol}")
+		logger.info(f"Connected to Firmata device at {self._port} with protocol version {self.firmata_protocol}")
 		while self._report_data.get(FirmataConstants.REPORT_FIRMWARE) == "":
 			await asyncio.sleep(0)
-		print(f"Firmata firmware: {self.firmata_firmware}")
+		logger.info(f"Firmata firmware: {self.firmata_firmware}")
 		# Ok, we got some firmware info, but we haven't confirmed that Sysex can be received by Firmata
 		self.CONNECTED_WITHOUT_SYSEX = True
 		# Let's query the firmware to see what's available
@@ -260,13 +237,13 @@ class Firmata:
 			
 
 	async def _find_firmata(self, timeout):
-		print("Checking for Firmata devices…")
+		logger.info("Checking for Firmata devices…")
 		ports = list_ports.comports()
 		# Find candidate devices
 		for port in ports:
 			if port.pid is not None:
 				# Open the candidate port and see if it could be a Firmata device
-				print(f"Trying {port.device}…")
+				logger.info(f"Trying {port.device}…")
 				self._port = port.device
 				try:
 					await self._connect_device(timeout)
@@ -280,7 +257,7 @@ class Firmata:
 	async def _firmata_command(self, command):
 		command_bytes = bytes(command)
 		try:
-			response = await self._device.write_async(command_bytes)
+			response = await self._device.write_async(command_bytes) # type: ignore
 		except SerialException:
 			raise RuntimeError('failed to send command')
 		return response
@@ -296,7 +273,7 @@ class Firmata:
 	# event handler for incoming data from the firmware
 	async def _firmata_data_handler(self):
 		while True:
-			incoming = await self._device.read_async()
+			incoming = await self._device.read_async() # type: ignore
 
 			# guard against empty bytes returned
 			if incoming:
@@ -320,17 +297,20 @@ class Firmata:
 
 	async def _handle_report_version(self):
 		# read the next two bytes to get the version number
-		major, minor = bytearray(await self._device.read_async(size=2))
+		major, minor = bytearray(await self._device.read_async(size=2)) # type: ignore
 		self._report_data[FirmataConstants.REPORT_VERSION] = f"{major}.{minor}"		
 
 	async def _handle_sysex(self):
 		# what type of sysex is this?
-		incoming = ord(await self._device.read_async())
+		incoming = ord(await self._device.read_async()) # type: ignore
 		sysex_handler = await self._sysex_handler_factory(incoming)
+		sysex_callback = await self._sysex_callback_factory(incoming)
 
 		sysex = await sysex_handler()
-
 		self._report_data[incoming] = sysex
+		
+		# fire callback for sysex responses, e.g., from an I2C read
+		await sysex_callback(sysex)
 
 	async def _sysex_handler_factory(self, report_type):
 		if report_type == FirmataConstants.REPORT_FIRMWARE:
@@ -355,14 +335,26 @@ class Firmata:
 			self.PENDING_SAMPLING_INTERVAL_QUERY = False
 			return self._build_sysex_sampling_interval
 		
+		if report_type == FirmataConstants.I2C_REPLY:
+			return self._build_sysex_i2c
+		
 		return self._build_sysex
 	
+	async def _null_sysex_handler(self, _):
+		pass
+
+	async def _sysex_callback_factory(self, sysex_type):
+		if sysex_type == FirmataConstants.I2C_REPLY:
+			return self._i2c_event_handler
+		
+		return self._null_sysex_handler
+ 
 	async def _build_sysex(self) -> list:
 		sysex = []
 		incoming = None
 		
 		while incoming is not FirmataConstants.END_SYSEX:
-			incoming = ord(await self._device.read_async())
+			incoming = ord(await self._device.read_async()) # type: ignore
 
 			if incoming is not FirmataConstants.END_SYSEX:
 				sysex.append(incoming)
@@ -371,7 +363,7 @@ class Firmata:
 
 	async def _build_sysex_firmware(self) -> str:
 		# get the firmware version number before the rest
-		fw_major, fw_minor = bytearray(await self._device.read_async(size=2))
+		fw_major, fw_minor = bytearray(await self._device.read_async(size=2)) # type: ignore
 		sysex = await self._build_sysex_string()
 		s = f"{fw_major}.{fw_minor} {sysex}"
 		return s
@@ -386,12 +378,12 @@ class Firmata:
 		msb = None
 
 		while incoming is not FirmataConstants.END_SYSEX:
-			incoming = ord(await self._device.read_async())
+			incoming = ord(await self._device.read_async()) # type: ignore
 			if incoming is FirmataConstants.END_SYSEX:
 				break
 			else:
 				lsb = incoming
-				msb = ord(await self._device.read_async())
+				msb = ord(await self._device.read_async()) # type: ignore
 				sysex.append(lsb + msb)
 
 		s = "".join(chr(c) for c in sysex)
@@ -399,7 +391,18 @@ class Firmata:
 		
 	async def _build_sysex_sampling_interval(self) -> int:
 		sysex = await self._build_sysex()
-		return sysex[0] + (sysex[1] << 7)
+		return from_7bit(sysex)
+	
+	async def _build_sysex_i2c(self) -> dict:
+		# the first two bytes are the I2C device address
+		addr_lsb, addr_msb = bytearray(await self._device.read_async(size=2)) # type: ignore
+		addr = from_7bit([addr_lsb, addr_msb])
+		# next two bytes are the register address
+		reg_lsb, reg_msb = bytearray(await self._device.read_async(size=2)) # type: ignore
+		reg = from_7bit([reg_lsb, reg_msb])
+		# all other bytes are data
+		sysex = await self._build_sysex()
+		return {"addr": addr, "reg": reg, "data": sysex}
 
 	# firmware info and control
 	async def report_version(self):
@@ -421,7 +424,7 @@ class Firmata:
 	async def set_sampling_interval(self, interval:int):
 		if interval < 10:
 			raise ValueError("Sampling interval cannot be less than 10ms")
-		data = [interval & 0x7f, (interval >> 7) & 0x7f]
+		data = to_7bit(interval)
 		await self._firmata_sysex_command(FirmataConstants.SAMPLING_INTERVAL, data)
 		self._sampling_interval_ms = interval
 
@@ -478,7 +481,7 @@ class Firmata:
 		if mode is FirmataConstants.PIN_MODE_ANALOG:
 			await self.set_analog_pin_reporting(pin, enable=True)
 		elif mode is FirmataConstants.PIN_MODE_INPUT or mode is FirmataConstants.PIN_MODE_PULLUP:
-			if pin in self.analog_pins:
+			if pin in self.analog_pins: # type: ignore
 				await self.set_analog_pin_reporting(pin, enable=False)
 			await self.set_digital_port_reporting(pin, enable=True)
 
@@ -495,7 +498,7 @@ class Firmata:
 
 	# digital pin operations
 	async def set_digital_port_reporting(self, pin: int, enable:bool=True):
-		port, _ = _pin_port_and_mask(pin)
+		port, _ = pin_port_and_mask(pin)
 		if enable:
 			command = (FirmataConstants.REPORT_DIGITAL + port, 1)
 		else:
@@ -517,22 +520,22 @@ class Firmata:
 			pin_value = 1
 		
 		if use_port:
-			port, mask = _pin_port_and_mask(pin)
+			port, mask = pin_port_and_mask(pin)
 			if pin_value == 1:
 				self._digital_ports[port] |= mask
 			else:
 				self._digital_ports[port] &= ~mask
-			command = (FirmataConstants.DIGITAL_MESSAGE + port, self._digital_ports[port] & 0x7f, (self._digital_ports[port] >> 7) & 0x7f)
+			command = [FirmataConstants.DIGITAL_MESSAGE + port] + to_7bit(self._digital_ports[port])
 		else:
 			command = (FirmataConstants.SET_DIGITAL_PIN_VALUE, pin, pin_value)
 		await self._firmata_command(command)
 	
 	async def _digital_event_handler(self, incoming):
 		# determine the port based on the initial message byte
-		port = _port_from_data(incoming)
+		port = port_from_data(incoming)
 		# read the LSB and MSB from
 		LSB, MSB = await self._device.read_async(size=2) # type: ignore
-		data = (MSB << 7) + LSB
+		data = from_7bit([LSB, MSB])
 		start = port * 8
 		# emit events for incoming pin data
 		for pin in range(start, start + 8):
@@ -560,82 +563,79 @@ class Firmata:
 		"""
 		pwm_pin = FirmataConstants.ANALOG_MESSAGE + pin
 		if pwm_pin < 0xf0:
-			command = (pwm_pin, value & 0x7f, (value >> 7) & 0x7f)
+			command = [pwm_pin] + to_7bit(value)
 			await self._firmata_command(command)
 		else:
-			data = [pin, value & 0x7f, (value >> 7) & 0x7f, (value >> 14) & 0x7f]
+			data = [pin] + to_7bit(value) + [(value >> 14) & 0x7f]
 			await self._firmata_sysex_command(FirmataConstants.EXTENDED_ANALOG, data)
 
 	async def _analog_event_handler(self, incoming):
 		pin = incoming - 210
-		# read the LSB and MSB from
+		# read the LSB and MSB from the response
 		LSB, MSB = await self._device.read_async(size=2)  # type: ignore
-		data = (MSB << 7) + LSB
+		data = from_7bit([LSB, MSB])
 		await self.callbacks.handle_event(pin, FirmataConstants.ANALOG_MESSAGE, value=data)
 
 	def _translate_analog_pin(self, analog_pin:str) -> int:
 		try:
 			possible_pin = analog_pin.upper().lstrip("A")
 			if possible_pin.isnumeric():
-				return self.analog_map.index(int(possible_pin))
+				return self.analog_map.index(int(possible_pin)) # type: ignore
 			else:
 				raise Exception(f"{analog_pin} is not a valid analog pin")
 		except:
 			raise Exception(f"{analog_pin} is not a valid analog pin")
 
-# utility functions
-def _pin_port_and_mask(pin:int) -> tuple:
-	return (pin // 8, 1 << (pin % 8))
+	# I2C operations
+	async def i2c_config(self, delay=0):
+		await self._firmata_sysex_command(FirmataConstants.I2C_CONFIG, to_7bit(delay))
+		self.is_i2c_configured = True
 
-def _port_from_data(data:int) -> int:
-	return data & 0x0f
-
-def _translate_capability_map(cmap:Optional[list]=None) -> Optional[dict]:
-	"""
-	Create a human-readable version of the capability map sent by the firmaware
-	"""
-	if cmap is None:
-		return
+	async def _i2c_request(
+			self,
+			address:int,
+			register:Optional[int] = None,
+			data:tuple=(),
+			number_of_bytes:Optional[int] = None,
+			mode:int=FirmataConstants.I2C_MODE_WRITE,
+			auto_restart:bool=False):
+		if not self.is_i2c_configured:
+			await self.i2c_config()
+		preamble = [address, mode]
+		if register is not None:
+			preamble = preamble + to_7bit(register)
+		if number_of_bytes is not None:
+			preamble = preamble + to_7bit(number_of_bytes)
+		to_send = preamble + sum([to_7bit(n) for n in data],[])
+		await self._firmata_sysex_command(FirmataConstants.I2C_REQUEST, to_send )
 	
-	MODES = ["DIGITAL_INPUT","DIGITAL_OUTPUT","ANALOG_INPUT","PWM","SERVO","SHIFT","I2C","ONEWIRE","STEPPER","ENCODER","SERIAL","INPUT_PULLUP","SPI","SONAR","TONE","DHT","FREQUENCY"]
-	pin:int = 0
-	tmap:dict = {}
-	caps:list = []
-	cap = True # flip flop betwen the capability and its resolution
-	
-	for item in cmap:
-		if item == 127: # this is the end of a pins capablities
-			tmap[f"pin_{pin}"] = caps
-			caps = []
-			pin = pin + 1
-		else:
-			if cap:
-				item = MODES[item]
-				cap = False
-			else:
-				cap = True
-			caps.append(item)
+	async def i2c_read(self, address:int, register: int, number_of_bytes:int):
+		await self._i2c_request(
+			address,
+			register=register,
+			number_of_bytes=number_of_bytes,
+			mode=FirmataConstants.I2C_MODE_READ_ONCE)
 
-	return tmap
+	async def i2c_read_continous(self, address:int, register:int, number_of_bytes:int):
+		await self._i2c_request(
+			address,
+			register=register,
+			number_of_bytes=number_of_bytes,
+			mode=FirmataConstants.I2C_MODE_READ_CONT)
 
-def _get_analog_pins(amap:Optional[list]=None) -> Optional[tuple]:
-	if amap is None:
-		return
-	analog_pins = []
+	async def i2c_read_stop(self, address:int, register:int):
+		data = (register,)
+		await self._i2c_request(address, register=register, mode=FirmataConstants.I2C_MODE_READ_STOP)
 
-	for pin in range(0, len(amap)):
-		if amap[pin] != 127:
-			analog_pins.append(pin)
-	
-	return tuple(analog_pins)
+	async def i2c_write(self, address: int, data:tuple):
+		await self._i2c_request(address, data=data)
 
-def _port_pin_values(port:int, data:int, total_pins:int=20) -> list:
-        pin_values = []
-        pins_per_port = 8
-        start_pin = port * pins_per_port
-        stop_pin = min(total_pins, port * pins_per_port + pins_per_port)
-        for pin in range(start_pin, stop_pin):
-                value = data & 0x01
-                pin_values.append(value)
-                data >>= 1
-        return pin_values
+	async def _i2c_event_handler(self, sysex):
+		address = sysex['addr']
+		register = sysex['reg']
+		data = sysex['data']
+		try:
+			await self.callbacks.handle_event(address, FirmataConstants.I2C_REPLY, register=register, value=data)
+		except:
+			logger.info(f"No handler registered for I2C_REPLAY for address {address}")
+			pass
